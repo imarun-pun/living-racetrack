@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lapwall · Start here</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<style>
+  :root { --bg: #07090d; --panel: #0f141c; --line: rgba(196,210,235,.14); --fg: #eef2f8; --muted: #8f99ad; --accent: #ffd43b; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .chq { height: 12px; background: repeating-conic-gradient(#eef2f8 0 25%, #07090d 0 50%) 0 0 / 12px 12px; }
+  main { max-width: 860px; margin: 0 auto; padding: 36px 20px 60px; display: grid; gap: 26px; }
+  .eyebrow { font: 600 12px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 6px 0 0; font: 800 clamp(40px, 7vw, 68px)/.95 "Arial Narrow", "Segoe UI", sans-serif; text-transform: uppercase; letter-spacing: .01em; }
+  h2 { margin: 0 0 4px; font: 800 24px/1.1 "Arial Narrow", "Segoe UI", sans-serif; text-transform: uppercase; }
+  p { margin: 0; color: #cfd6e3; }
+  .ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 12px; align-content: start; }
+  .tag { justify-self: start; font: 700 11px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; background: var(--accent); color: #1a1300; padding: 6px 9px; border-radius: 4px; }
+  ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  li::marker { color: var(--accent); font-weight: 700; }
+  code, kbd { font: 600 13px/1 ui-monospace, Menlo, Consolas, monospace; background: #1a2130; border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; }
+  .small { font-size: 14px; color: var(--muted); }
+  .lic { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; }
+  ul.videos { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="chq"></div>
+<main>
+  <header>
+    <div class="eyebrow">Lapwall · Live Art for your wall</div>
+    <h1>Start here</h1>
+  </header>
+  <p>This stick turns any screen into a living race: cars racing real-layout circuits under floodlights, close battles from the chase cam, champagne on the podium. Pick the way that fits your screen.</p>
+
+  <div class="ways">
+    <section class="card">
+      <span class="tag">Easiest · any smart TV</span>
+      <h2>Straight into the TV</h2>
+      <ol>
+        <li>Plug this stick into the TV's USB port.</li>
+        <li>Open the TV's media or USB app and go into <b>TV - plug the stick into the TV</b>.</li>
+        <li>Play the first video and turn on <b>Repeat all</b> (or Loop) in the player's options.</li>
+      </ol>
+      <p class="small">Works on most smart TVs and digital signage screens. No internet or computer needed. On this stick:</p>
+      <ul class="videos">{{VIDEOS}}</ul>
+    </section>
+    <section class="card">
+      <span class="tag">Live · never repeats</span>
+      <h2>With a computer</h2>
+      <ol>
+        <li>Connect a computer or mini PC to the screen and plug in this stick.</li>
+        <li>Open <b>Computer - Windows, Mac, Linux</b>, then your system's folder, and start Lapwall.</li>
+        <li>It opens full screen in <b>wall display mode</b>: a new race every few minutes, floodlights that follow the time of day, and the screen kept awake.</li>
+      </ol>
+      <p class="small">Windows: if SmartScreen appears, choose <i>More info</i> → <i>Run anyway</i>. Mac: unzip, then right-click Lapwall → <i>Open</i> the first time. Linux: allow the AppImage to run as a program.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Lock it, leave it</h2>
+    <p>Wall display mode hides the cursor and ignores the keyboard, so nobody passing by can change it. To leave, press <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>L</kbd> (<kbd>Cmd</kbd> <kbd>Shift</kbd> <kbd>L</kbd> on a Mac) and enter your PIN.</p>
+    <p>Set a PIN from the Lapwall icon next to the clock (the menu bar on a Mac): <b>Wall display → Set a PIN</b>. You can also choose which screen it uses and whether it starts on its own when the computer turns on.</p>
+  </section>
+
+  <section class="lic">
+    <div class="eyebrow">Your licence</div>
+    <p><b>{{NAME}}</b> · {{ID}} · {{DATE}}</p>
+    <p class="small">This copy of Lapwall is licensed to you for your own screens. Please do not share the stick, the videos or the licence file: each one carries your licence ID. Keep <code>lapwall.license</code> at the top of the stick; the app reads it from there.</p>
+  </section>
+  <p class="small">Lapwall is an original fan display by Arun Pun. It is not affiliated with Formula 1, the FIA or any team. The races are simulated.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Display PIN</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'">
+<link rel="stylesheet" href="app/css/fonts.css">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 22px; background: #0d1118; color: #eef2f8; font: 400 14px/1.45 "Saira", "Segoe UI", sans-serif; }
+  h1 { margin: 0 0 6px; font: 800 24px/1 "Saira Condensed", "Arial Narrow", sans-serif; text-transform: uppercase; }
+  p { margin: 0 0 14px; color: #8a94a8; }
+  label { display: grid; gap: 5px; margin-bottom: 10px; font: 600 10.5px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: #8a94a8; }
+  input { font: 600 18px/1 "JetBrains Mono", monospace; letter-spacing: .3em; color: #eef2f8; background: #151a23; border: 1px solid rgba(196,210,235,.14); border-radius: 5px; padding: 10px; }
+  input:focus { outline: 2px solid #ffd43b; outline-offset: 1px; }
+  .row { display: flex; gap: 8px; margin-top: 6px; }
+  button { font: 600 11px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: #eef2f8; background: #151a23; border: 1px solid rgba(196,210,235,.2); border-radius: 4px; padding: 11px 14px; cursor: pointer; }
+  button.primary { background: #ffd43b; color: #1a1300; border-color: #ffd43b; }
+  #msg { min-height: 1.4em; margin: 10px 0 0; }
+  #msg.err { color: #ff5a5a; } #msg.ok { color: #2fd780; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<h1>Display PIN</h1>
+<p>Anyone who wants to leave wall display mode will need this PIN. Use 4 to 12 digits. Leave both boxes empty to remove the PIN.</p>
+<form id="f">
+  <label id="curWrap">Current PIN<input id="cur" type="password" inputmode="numeric" maxlength="12" autocomplete="off"></label>
+  <label>New PIN<input id="a" type="password" inputmode="numeric" maxlength="12" autocomplete="off"></label>
+  <label>New PIN again<input id="b" type="password" inputmode="numeric" maxlength="12" autocomplete="off"></label>
+  <div class="row"><button class="primary" type="submit">Save</button><button type="button" id="close">Close</button></div>
+  <p id="msg" aria-live="polite"></p>
+</form>
+<script src="pin.js"></script>
+</body>
+</html>

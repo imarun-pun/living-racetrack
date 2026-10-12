@@ -94,7 +94,8 @@ PW.FACTS = [
 ];
 
 PW.DEFAULT_SETTINGS = {
-  mode: 'race',             // race | ambient
+  mode: 'race',             // race | ambient | art (Live Art: no on-screen text, a camera director)
+  light: 'clock',           // clock | day | night: floodlights follow the local time
   rotation: 'all',          // all | original | real | custom | single
   single: 'marina-lights',
   laps: 12,

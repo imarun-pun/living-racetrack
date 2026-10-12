@@ -71,11 +71,19 @@
       <p class="fact"><b>DID YOU KNOW</b><span data-fact></span></p>
     </div>
   </section>
+  <div class="artfx" aria-hidden="true"></div>
+  <div class="artcap" id="artcap" aria-live="polite"><b></b><span></span></div>
+  <div class="wm" id="wm" hidden></div>
   <canvas class="driveby" id="driveby" hidden aria-hidden="true"></canvas>
   <div class="fader" id="fader"></div>
+  <div class="pinpad" id="pinpad" hidden role="dialog" aria-label="Unlock display">
+    <p id="pinmsg">Enter the PIN</p><div class="dots" id="pindots" aria-live="polite"></div>
+    <div class="keys"><button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button><button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button><button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" data-k="x">Cancel</button><button type="button" data-k="0">0</button><button type="button" data-k="b">⌫</button></div>
+    <button type="button" class="ok" data-k="ok">OK</button>
+  </div>
   <nav class="controls" aria-label="Display controls">
     <button id="bview" type="button">View: TV map</button>
-    <button id="bmode" type="button">Ambient</button>
+    <button id="bmode" type="button">Mode: Race view</button>
     <button id="bnext" type="button">Next race</button>
     <a class="btn" id="bsend" href="send.html" target="_blank" rel="noopener">Send a Zoom-by</a>
     <button id="bset" type="button">Customize</button>
@@ -98,6 +106,7 @@
       <label class="field">View <select id="s-view"><option value="map">TV map</option><option value="chase">Chase cam</option><option value="onboard">Onboard (driver's eye)</option></select></label>
       <label class="field">Camera follows <select id="s-cam"><option value="-1">Race leader</option></select></label>
       <label class="field">World map <select id="s-loc"><option value="auto">Show, hide if it covers the track</option><option value="on">Always show</option><option value="off">Hide</option></select></label>
+      <label class="field">Lighting <select id="s-light"><option value="clock">Follow the clock (floodlights at night)</option><option value="day">Always day</option><option value="night">Always night race</option></select></label>
       <label class="field">Map zoom <select id="s-zoom"><option value="close">Close</option><option value="normal">Normal</option><option value="wide">Wide, with surroundings</option></select></label>
       <div class="row-btns">
         <label class="btn">Import track file<input type="file" id="s-import" accept=".geojson,.json,application/json"></label>
@@ -166,6 +175,7 @@
   </aside>
 </div>
 <!--BODY-END-->
+<script src="js/capture.js"></script>
 <script src="js/data.js"></script>
 <script src="js/flags.js"></script>
 <script src="js/tracks-real.js"></script>

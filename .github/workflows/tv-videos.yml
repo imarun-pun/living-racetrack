@@ -1,0 +1,73 @@
+# Renders the TV videos for the Lapwall USB kit: one MP4 per circuit, from the start lights to the
+# end of the garage break, so a TV's "repeat all" plays them as an endless loop.
+# Run it from the Actions tab (Run workflow). Download the "tv-videos" artifact when it finishes,
+# then build each buyer's kit on your own computer with tools/usb-kit.mjs (it adds their licence ID).
+# These master videos carry no buyer details.
+name: Render TV videos
+on:
+  workflow_dispatch:
+    inputs:
+      light:
+        description: Lighting
+        type: choice
+        options: [night, day]
+        default: night
+      laps:
+        description: Laps per race (12 laps is about 6 minutes)
+        type: choice
+        options: ['6', '12', '20']
+        default: '12'
+      size:
+        description: Video size
+        type: choice
+        options: [1920x1080, 3840x2160]
+        default: 1920x1080
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { n: '01', id: gb-1948, name: Silverstone }
+          - { n: '02', id: mc-1929, name: Monaco }
+          - { n: '03', id: sg-2008, name: Singapore }
+          - { n: '04', id: jp-1962, name: Suzuka }
+          - { n: '05', id: it-1922, name: Monza }
+          - { n: '06', id: be-1925, name: Spa }
+          - { n: '07', id: marina-lights, name: Marina Lights }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright and ffmpeg
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install playwright==1.48.0
+          python -m playwright install --with-deps chromium
+      - name: Render
+        run: python tools/render-video.py --track ${{ matrix.id }} --light ${{ inputs.light }} --laps ${{ inputs.laps }} --size ${{ inputs.size }} --out "out/${{ matrix.n }} ${{ matrix.name }} (${{ inputs.light }}).mp4"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-video-${{ matrix.n }}
+          path: out/*.mp4
+          retention-days: 30
+  bundle:
+    needs: render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tv-video-*
+          merge-multiple: true
+          path: tv-videos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-videos
+          path: tv-videos/*.mp4
+          retention-days: 30
+          compression-level: 0

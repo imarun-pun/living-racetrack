@@ -1,8 +1,8 @@
 {
   "name": "lapwall-desktop",
   "productName": "Lapwall",
-  "version": "0.4.0",
-  "description": "Lapwall for your desktop: the race display in a window, plus cars that drive by above your taskbar.",
+  "version": "0.5.0",
+  "description": "Lapwall for your desktop and wall screens: the race display in a window, Zoom-bys above your taskbar, and a locked wall display mode.",
   "main": "main.js",
   "author": "Arun Pun",
   "license": "SEE LICENSE IN ../LICENSE.md",
@@ -14,17 +14,57 @@
   },
   "devDependencies": {
     "electron": "33.2.1",
-    "electron-builder": "25.1.8"
+    "electron-builder": "25.1.8",
+    "@electron/fuses": "1.8.0"
   },
   "build": {
     "appId": "com.arunpun.lapwall",
     "productName": "Lapwall",
     "copyright": "Copyright © 2026 Arun Pun",
-    "directories": { "output": "release" },
-    "files": ["main.js", "preload.js", "overlay.html", "overlay.js", "app/**/*"],
-    "win": { "target": "nsis", "icon": "app/icons/icon-512.png" },
-    "nsis": { "oneClick": true, "artifactName": "Lapwall-Setup-${version}.${ext}" },
-    "mac": { "target": "dmg", "category": "public.app-category.entertainment", "icon": "app/icons/icon-512.png", "artifactName": "Lapwall-${version}.${ext}" },
-    "linux": { "target": "AppImage", "icon": "app/icons/icon-512.png", "artifactName": "Lapwall-${version}.${ext}" }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-app.js",
+      "license.js",
+      "license-public.pem",
+      "overlay.html",
+      "overlay.js",
+      "pin.html",
+      "pin.js",
+      "app/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "app/icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "Lapwall-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "app/icons/icon-512.png",
+      "artifactName": "Lapwall-${version}-mac.${ext}"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "app/icons/icon-512.png",
+      "artifactName": "Lapwall-${version}.${ext}"
+    },
+    "asar": true,
+    "afterPack": "./fuses.js",
+    "portable": {
+      "artifactName": "Lapwall-Portable-${version}.${ext}"
+    }
   }
 }

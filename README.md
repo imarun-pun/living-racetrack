@@ -14,6 +14,9 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 
 | | |
 |---|---|
+| **Live Art** | The race as moving art for a wall screen: no timing tower or buttons, a slow camera drift, cuts to the closest battle in chase and onboard view, and a museum-style caption for each circuit. Press `A` to cycle Race view, Ambient and Live Art. |
+| **Day and night** | Floodlights come up at dusk and the track glows under them at night, with warm light at sunrise and sunset, all following your local clock. Sparks fly from the cars on fast straights, rubber builds up on the racing line, and spins leave marks. |
+| **Wall display mode** | The desktop app runs Live Art full screen and locked: no cursor, keyboard ignored, screen kept awake, restarts itself if anything goes wrong. Leave with `Ctrl+Shift+L` and the owner's PIN. |
 | **Race view** | 20 cars, a live timing tower with flags, gaps and tyre compounds, start lights, DRS overtakes, fastest laps, team radio and a race feed. |
 | **Your drivers** | Put yourself and your friends on the grid: names, national flags (50 countries) and car numbers. |
 | **Season** | Every race scores points (25-18-15…, plus fastest lap). Standings carry over, so friends can race each other all season. |
@@ -79,6 +82,8 @@ npm start
 
 The installers are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper will ask you to confirm the first time.
 
+**Wall kit on a USB stick:** for selling Lapwall as Live Art, a USB stick carries looping TV videos (play straight from any smart TV's USB port) and the locked desktop app, with a signed licence for the buyer. See [docs/WALL_KIT.md](docs/WALL_KIT.md).
+
 **GitHub Pages:** the included workflow publishes the site on every push to `main`. Turn it on under *Settings → Pages → Source: GitHub Actions*.
 
 ### Keys
@@ -105,10 +110,14 @@ js/share.js, send.html, go.html   send-a-Zoom-by links and QR codes
 js/calendar.js          real race-weekend dates
 js/world.js, locator.js world locator map
 js/vendor/qrcode.js     QR code generator (MIT)
-js/main.js              app shell: race weekend loop, HUD, settings, controls
-tools/                  local server, single-file build, track converter
+js/main.js              app shell: race weekend loop, HUD, settings, controls, Live Art director
+js/carside.js           side-view race car (Zoom-bys, garage)
+js/capture.js           frame-exact clock for recording TV videos (?capture)
+tools/                  local server, single-file build, track converter, TV video recorder,
+                        licence signing (license.mjs) and USB kit builder (usb-kit.mjs)
 install/                Raspberry Pi kiosk installer
-desktop/                Electron tray app: display window and Zoom-by overlay
+desktop/                Electron tray app: display window, Zoom-by overlay, locked wall display,
+                        licence check (license.js)
 docs/                   origin record, roadmap, customization guide
 ```
 

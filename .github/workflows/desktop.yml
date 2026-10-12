@@ -1,5 +1,6 @@
 # Builds the Lapwall desktop app for Windows, macOS and Linux.
 # Run it from the Actions tab (Run workflow), or push a version tag like v0.3.0.
+# Windows gives an installer and a portable .exe (runs straight from a USB stick), macOS a .dmg and a .zip, Linux an AppImage.
 name: Build desktop app
 on:
   workflow_dispatch:
@@ -32,4 +33,5 @@ jobs:
           path: |
             desktop/release/*.exe
             desktop/release/*.dmg
+            desktop/release/*-mac.zip
             desktop/release/*.AppImage

@@ -1,3 +1,10 @@
 node_modules/
 dist/
 .DS_Store
+
+# Lapwall licences and keys never go in the repo (the public key desktop/license-public.pem is the only one that does)
+*.license
+*private*.pem
+kit/
+tv-masters/
+desktop-builds/

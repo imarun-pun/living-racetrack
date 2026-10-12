@@ -1,10 +1,10 @@
 /* Offline cache so an installed Lapwall keeps running without Wi-Fi. */
-const CACHE = 'lapwall-v8';
+const CACHE = 'lapwall-v9';
 const FILES = ['./', './index.html', './css/fonts.css', './css/style.css',
   './fonts/saira-condensed-latin-500-normal.woff2', './fonts/saira-condensed-latin-700-normal.woff2', './fonts/saira-condensed-latin-800-normal.woff2',
   './fonts/saira-latin-400-normal.woff2', './fonts/saira-latin-500-normal.woff2', './fonts/saira-latin-600-normal.woff2',
   './fonts/jetbrains-mono-latin-400-normal.woff2', './fonts/jetbrains-mono-latin-600-normal.woff2', './manifest.webmanifest', './icons/icon.svg',
-  './js/data.js', './js/flags.js', './js/tracks-real.js', './js/circuit.js', './js/sim.js', './js/render.js', './js/pitcam.js', './js/garage.js', './js/carside.js', './js/driveby.js', './js/main.js',
+  './js/capture.js', './js/data.js', './js/flags.js', './js/tracks-real.js', './js/circuit.js', './js/sim.js', './js/render.js', './js/pitcam.js', './js/garage.js', './js/carside.js', './js/driveby.js', './js/main.js',
   './js/share.js', './js/celebrate.js', './js/world.js', './js/locator.js', './js/calendar.js', './js/onboard.js', './js/send.js', './js/go.js', './js/vendor/qrcode.js',
   './send.html', './go.html', './z/', './js/forward.js', './css/share.css'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));

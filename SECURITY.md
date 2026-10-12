@@ -13,6 +13,9 @@ Lapwall is built so there is nothing to steal.
 - Everything you type (driver and team names, reminder text, imported track names) is treated as plain text, escaped before display and clamped to a fixed length. Saved settings are re-validated every time they load.
 - Imported track files are parsed as JSON only, never run as code, and are rejected over 5 MB or 20,000 points.
 - Desktop app (Electron): context isolation, sandboxed renderers and no Node.js access in any page; navigation, pop-ups, embedded web views and device permissions (camera, microphone, location, notifications) are all blocked. The Zoom-by window is click-through and never takes focus.
+- Hardened packaging: Electron fuses switch off run-as-Node, `NODE_OPTIONS` and the inspector switches, and the app only loads from its packaged archive. Developer tools are off in packaged builds.
+- Wall display mode: kiosk window, keyboard and right-click swallowed, closing blocked. Leaving needs the owner's PIN, stored as a salted scrypt hash, with a lockout after five wrong tries that doubles each time.
+- Licences: Ed25519 signatures. The app ships only the public key, so it can check a licence but cannot create one. The private key stays on the seller's own computer and is never in this repository. Licence files are size-limited and strictly validated before use.
 - Dependencies: the web app has none. The desktop app only uses Electron and electron-builder for packaging; Dependabot watches them and the GitHub Actions for updates.
 
 ## Keeping the repository safe

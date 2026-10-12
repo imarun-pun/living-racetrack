@@ -72,11 +72,20 @@ PW.carSprite = function (c1, c2) {
 PW.Renderer = class Renderer {
   constructor(canvas) {
     this.cv = canvas; this.ctx = canvas.getContext('2d');
-    this.layer = document.createElement('canvas'); this.puffs = []; this.drops = [];
+    this.layer = document.createElement('canvas'); this.puffs = []; this.drops = []; this.sparks = []; this.marks = [];
+    this.light = { night: 0, golden: 0 };
     for (let k = 0; k < 220; k++) this.drops.push({ x: Math.random(), y: Math.random(), l: .6 + Math.random() * .8, v: .7 + Math.random() * .6 });
     this.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
-  setCircuit(C) { this.C = C; }
+  setCircuit(C) { this.C = C; this.marks = []; this.sparks = []; }
+  /* Time of day: night 0..1 brings up the floodlights, golden 0..1 warms the light. Redraws the static layer only when it changes. */
+  setLight(l) {
+    const q = v => Math.round(v * 10) / 10, n = { night: q(l.night), golden: q(l.golden) };
+    if (n.night === this.light.night && n.golden === this.light.golden) return false;
+    this.light = n; if (this.SX) this.drawStatic(); return true;
+  }
+  /* Rubber left on the track by a spin, crash or lock-up. */
+  addMark(s, lat) { this.marks.push({ s, lat }); if (this.marks.length > 40) this.marks.shift(); }
   layout(W, H, DPR, r, opts = {}) {
     const C = this.C, N = PW.N;
     this.style = opts.style || 'circuit';
@@ -106,20 +115,27 @@ PW.Renderer = class Renderer {
     return p;
   }
   drawStatic() {
+    // the background sits still in screen space, so camera moves never show the edge of the track layer
+    if (!this.bgLayer) this.bgLayer = document.createElement('canvas');
+    this.bgLayer.width = Math.round(this.W * this.DPR); this.bgLayer.height = Math.round(this.H * this.DPR);
+    const b = this.bgLayer.getContext('2d'); b.setTransform(this.DPR, 0, 0, this.DPR, 0, 0); this.drawBg(b);
     this.layer.width = Math.round(this.W * this.ls); this.layer.height = Math.round(this.H * this.ls);
     const g = this.layer.getContext('2d'); g.setTransform(this.ls, 0, 0, this.ls, 0, 0);
     if (this.style === 'circuit') this.drawCircuit(g); else this.drawNeon(g);
+  }
+  drawBg(g) {
+    const { W, H } = this, hue = this.C.def.hue || '#38c6ff', neon = this.style !== 'circuit';
+    g.fillStyle = '#07090d'; g.fillRect(0, 0, W, H);
+    const rg = g.createRadialGradient(W * .6, H * .5, 0, W * .6, H * .5, Math.max(W, H) * .7);
+    rg.addColorStop(0, hue + (neon ? '1c' : '16')); rg.addColorStop(1, hue + '00'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
+    g.fillStyle = `rgba(200,215,240,${neon ? .055 : .05})`;
+    for (let x = 14; x < W; x += 28) for (let y = 14; y < H; y += 28) g.fillRect(x, y, 1.2, 1.2);
   }
   /* Realistic circuit: grass, run-off, gravel traps, tyre walls, grandstands, pit garages, grid boxes. */
   drawCircuit(g) {
     const { W, H, C, w } = this, L = C.L, inside = C.inside;
     // dark night background, so the circuit pops
     const hue = C.def.hue || '#38c6ff';
-    g.fillStyle = '#07090d'; g.fillRect(0, 0, W, H);
-    const rg = g.createRadialGradient(W * .6, H * .5, 0, W * .6, H * .5, Math.max(W, H) * .7);
-    rg.addColorStop(0, hue + '16'); rg.addColorStop(1, hue + '00'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(200,215,240,.05)';
-    for (let x = 14; x < W; x += 28) for (let y = 14; y < H; y += 28) g.fillRect(x, y, 1.2, 1.2);
     g.lineJoin = 'round'; g.lineCap = 'round';
     g.save(); g.strokeStyle = hue; g.globalAlpha = .1; g.lineWidth = w * 4.2; g.shadowColor = hue; g.shadowBlur = 36; g.stroke(this.path); g.restore();
     // verge and run-off
@@ -155,8 +171,9 @@ PW.Renderer = class Renderer {
     }
     // track: white edge lines and asphalt
     g.strokeStyle = '#eef0f3'; g.lineWidth = w + 2.4; g.stroke(this.path);
-    g.strokeStyle = '#3a3e44'; g.lineWidth = w; g.stroke(this.path);
-    g.save(); g.globalAlpha = .18; g.strokeStyle = '#1d2024'; g.lineWidth = w * .35; g.stroke(this.path); g.restore();   // racing line rubber
+    g.strokeStyle = this.light.night > .5 ? '#34383e' : '#3d4148'; g.lineWidth = w; g.stroke(this.path);
+    g.save(); g.globalAlpha = .1; g.strokeStyle = '#1d2024'; g.lineWidth = w * .35; g.stroke(this.path); g.restore();   // racing line rubber (more builds up during the race)
+    this.lighting(g);
     this.kerbs(g, '#f2f4f8', '#d6332b');
     // grid boxes
     for (let k = 0; k < 20; k++) {
@@ -171,6 +188,32 @@ PW.Renderer = class Renderer {
     g.fillStyle = '#111317'; g.fillRect(-2, -w * .9, 4, w * 1.8); g.fillStyle = '#ff2b2b';
     for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(0, -w * .6 + k * w * .3, 1.4, 0, 6.29); g.fill(); }
     g.restore();
+  }
+  /* Floodlights at night (light towers along the outside, warm pools on the asphalt) and a low warm sun at golden hour. */
+  lighting(g) {
+    const { W, H, C, w } = this, L = C.L, night = this.light.night, golden = this.light.golden;
+    if (night > .05) {
+      const n = Math.max(16, Math.min(70, Math.round(L / 110))), out = -C.inside;
+      g.save(); g.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < n; k++) {
+        const s = k * L / n, side = k % 3 === 2 ? -out : out, [x, y] = this.at(s, side * w * 2.2), r = w * 3.6;
+        const pool = g.createRadialGradient(x, y, 0, x, y, r);
+        pool.addColorStop(0, `rgba(255,236,200,${.26 * night})`); pool.addColorStop(.55, `rgba(255,228,190,${.09 * night})`); pool.addColorStop(1, 'rgba(255,228,190,0)');
+        g.fillStyle = pool; g.beginPath(); g.arc(x, y, r, 0, 6.29); g.fill();
+        const [px, py] = this.at(s, side * w * 2.75);
+        g.fillStyle = `rgba(255,248,230,${.9 * night})`; g.beginPath(); g.arc(px, py, Math.max(1.2, w * .09), 0, 6.29); g.fill();
+        const halo = g.createRadialGradient(px, py, 0, px, py, w * .8);
+        halo.addColorStop(0, `rgba(255,240,210,${.35 * night})`); halo.addColorStop(1, 'rgba(255,240,210,0)');
+        g.fillStyle = halo; g.beginPath(); g.arc(px, py, w * .8, 0, 6.29); g.fill();
+      }
+      g.restore();
+    }
+    if (golden > .05) {
+      g.save(); g.globalCompositeOperation = 'soft-light';
+      const sun = g.createLinearGradient(0, H, W, 0);
+      sun.addColorStop(0, `rgba(255,150,60,${.5 * golden})`); sun.addColorStop(1, 'rgba(255,190,120,0)');
+      g.fillStyle = sun; g.fillRect(0, 0, W, H); g.restore();
+    }
   }
   bounds() {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, m = this.w * 3;
@@ -214,11 +257,6 @@ PW.Renderer = class Renderer {
   /* Neon night look: glowing track on a dark grid. */
   drawNeon(g) {
     const { W, H, C, w } = this, L = C.L, hue = C.def.hue;
-    g.fillStyle = '#07090d'; g.fillRect(0, 0, W, H);
-    const rg = g.createRadialGradient(W * .6, H * .5, 0, W * .6, H * .5, Math.max(W, H) * .7);
-    rg.addColorStop(0, hue + '1c'); rg.addColorStop(1, hue + '00'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(200,215,240,.055)';
-    for (let x = 14; x < W; x += 28) for (let y = 14; y < H; y += 28) g.fillRect(x, y, 1.2, 1.2);
     g.lineJoin = 'round'; g.lineCap = 'round';
     g.save(); g.strokeStyle = hue; g.globalAlpha = .16; g.lineWidth = w * 2.8; g.shadowColor = hue; g.shadowBlur = 40; g.stroke(this.path); g.restore();
     g.strokeStyle = 'rgba(232,238,250,.6)'; g.lineWidth = w + 3; g.stroke(this.path);
@@ -282,17 +320,30 @@ PW.Renderer = class Renderer {
     const ctx = this.ctx, C = this.C, w = this.w, W = this.W, H = this.H, L = C.L;
     ctx.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
     const cam = view.cam && !view.cam.cleared ? view.cam : null;
+    ctx.drawImage(this.bgLayer, 0, 0, W, H);
     if (cam) {
       // chase cam: zoomed in, rotating with the car so it always points up the screen
-      ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, W, H);
       const [cx, cy, ca] = this.at(cam.dist, cam.lat * w * .3);
       const target = ca + Math.PI / 2; let da = target - (this.camA ?? target); da = Math.atan2(Math.sin(da), Math.cos(da));
       this.camA = (this.camA ?? target) + da * Math.min(1, (dtR || .016) * 3);
       const Z = Math.max(2.2, Math.min(5, 38 / w * 1.3));
       ctx.save(); ctx.translate(W / 2, H * .62); ctx.rotate(-this.camA); ctx.scale(Z, Z); ctx.translate(-cx, -cy);
+    } else if (view.drift) {
+      // Live Art: a slow push-in and pan, like a camera on a crane
+      const d = view.drift;
+      ctx.save(); ctx.translate(W / 2 + d.x, H / 2 + d.y); ctx.scale(d.k, d.k); ctx.translate(-W / 2, -H / 2);
     }
     ctx.drawImage(this.layer, 0, 0, W, H);
     const rain = race.weather.rain;
+    if (this.style === 'circuit') {
+      const prog = race.startT === undefined ? 0 : Math.min(1, (race.leaderLap() - 1) / Math.max(1, race.laps - 1));
+      ctx.save(); ctx.globalAlpha = (.04 + .22 * prog) * (1 - .6 * rain); ctx.strokeStyle = '#121417'; ctx.lineWidth = w * .3; ctx.lineJoin = 'round'; ctx.stroke(this.path); ctx.restore();
+      if (this.marks.length) {
+        ctx.save(); ctx.strokeStyle = 'rgba(10,11,13,.5)'; ctx.lineWidth = Math.max(1, w * .07); ctx.lineCap = 'round';
+        for (const m of this.marks) for (const o of [-.22, .22]) ctx.stroke(this.offPath(m.s - 34, m.s, (m.lat * .3 + o) * w, 3));
+        ctx.restore();
+      }
+    }
     if (rain > .02) { ctx.save(); ctx.strokeStyle = '#8fc7ff'; ctx.globalAlpha = .12 * rain; ctx.lineWidth = w * .7; ctx.lineJoin = 'round'; ctx.stroke(this.path); ctx.restore(); }
     if (race.sc) { ctx.save(); ctx.strokeStyle = '#ffc21a'; ctx.globalAlpha = .18 + .1 * Math.sin(now / 300); ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.stroke(this.path); ctx.restore(); }
     if (race.yellow && !race.sc) {
@@ -355,6 +406,31 @@ PW.Renderer = class Renderer {
       if (c.out && !pose && Math.floor(now / 400) % 2) { ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, len * .9, 0, 6.29); ctx.stroke(); }
       if (view.fav === c.team && !c.out) { ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = .5 + .3 * Math.sin(now / 250); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, len * .85, 0, 6.29); ctx.stroke(); ctx.globalAlpha = 1; }
     }
+    // sparks from the skid blocks on fast straights, brightest under floodlights
+    if (!this.reduce && dtR > 0 && race.state === 'racing') {
+      const glow = .45 + .55 * this.light.night;
+      for (const c of race.cars) {
+        if (c.out || c.inPit || c.v < 74 || Math.random() > .22 * dtR * 60 * .25) continue;
+        const i = Math.floor(mod(c.dist, L) / C.ds); if (Math.abs(C.K[i]) > 1 / 900) continue;
+        const [x, y, a] = this.at(c.dist - 2.4, c.lat * latPx);
+        for (let k = 0; k < 4; k++) {
+          const sp = (60 + Math.random() * 120) * Math.max(.6, w / 14), da = a + Math.PI + (Math.random() - .5) * .7;
+          this.sparks.push({ x, y, vx: Math.cos(da) * sp, vy: Math.sin(da) * sp, life: .18 + Math.random() * .25, g: glow });
+        }
+      }
+    }
+    if (this.sparks.length > 500) this.sparks.splice(0, this.sparks.length - 500);
+    if (this.sparks.length) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      this.sparks = this.sparks.filter(p => (p.life -= dtR) > 0);
+      for (const p of this.sparks) {
+        const x2 = p.x + p.vx * .03, y2 = p.y + p.vy * .03;
+        ctx.strokeStyle = `rgba(255,${190 + Math.random() * 60 | 0},120,${Math.min(1, p.life * 4) * p.g})`; ctx.lineWidth = Math.max(1, w * .07);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(x2, y2); ctx.stroke();
+        p.x += p.vx * dtR; p.y += p.vy * dtR; p.vx *= .9; p.vy *= .9;
+      }
+      ctx.restore();
+    }
     // labels
     if (view.labels && race.state !== 'grid') {
       ctx.font = `600 ${Math.max(10, w * .6)}px "JetBrains Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -374,7 +450,7 @@ PW.Renderer = class Renderer {
         ctx.fillStyle = '#eef2f8'; ctx.fillText(t, x + (fw ? (fw + 4) / 2 : 0) + 1, y + .5);
       });
     }
-    if (cam) ctx.restore();
+    if (cam || view.drift) ctx.restore();
     // rain
     if (rain > .02) {
       ctx.fillStyle = `rgba(6,12,24,${.28 * rain})`; ctx.fillRect(0, 0, W, H);

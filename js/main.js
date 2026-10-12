@@ -12,7 +12,8 @@ function load() {
   // imported tracks come back from storage: keep only well-formed ones
   s.custom = Array.isArray(s.custom) ? s.custom.filter(t => t && typeof t.id === 'string' && Array.isArray(t.pts) && t.pts.length >= 8 && t.pts.length <= 20000 &&
     t.pts.every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))).map(t => ({ ...t, kind: 'custom', name: String(t.name || 'Custom track').replace(/[<>]/g, '').slice(0, 40), hue: '#ff6fb1', length: +t.length || undefined })) : [];
-  if (!['race', 'ambient'].includes(s.mode)) s.mode = 'race';
+  if (!['race', 'ambient', 'art'].includes(s.mode)) s.mode = 'race';
+  if (!['clock', 'day', 'night'].includes(s.light)) s.light = 'clock';
   s.players = Array.isArray(s.players) ? s.players.slice(0, 8).map(p => ({ name: String((p && p.name) || 'Player').replace(/[<>\u0000-\u001f]/g, '').slice(0, 16), a: Math.max(0, Math.min(19, +(p && p.a) || 0)), b: Math.max(0, Math.min(19, +(p && p.b) || 0)) })) : [];
   if (!['circuit', 'neon'].includes(s.mapStyle)) s.mapStyle = 'circuit';
   if (!['close', 'normal', 'wide'].includes(s.mapZoom)) s.mapZoom = 'normal';
@@ -32,7 +33,17 @@ function load() {
   return s;
 }
 let S = load();
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+/* Recording TV videos (?capture&track=…&light=night&laps=…): Live Art, no reminders, nothing saved. */
+const CAP = /[?&]capture\b/.test(location.search) ? new URLSearchParams(location.search) : null;
+if (CAP) {
+  S.mode = 'art'; S.weekendSync = false; S.driveby = false;
+  S.reminders = { ...S.reminders, water: false, stretch: false, eyes: false, customMins: 0 };
+  if (['clock', 'day', 'night'].includes(CAP.get('light'))) S.light = CAP.get('light');
+  if (CAP.get('track')) { S.rotation = 'single'; S.single = CAP.get('track'); }
+  if ([6, 12, 20].includes(+CAP.get('laps'))) S.laps = +CAP.get('laps');
+  if (CAP.get('garage') === '0') S.garage = false;
+}
+const save = () => { if (CAP) return; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const teams = () => PW.resolveTeams(S);
 const drivers = () => PW.resolveDrivers(S);
 const allTracks = () => [...PW.ORIGINAL_CIRCUITS, ...(PW.REAL_CIRCUITS || []), ...S.custom];
@@ -57,9 +68,19 @@ const driveBy = new PW.DriveBy($('driveby'));
 const celebration = new PW.Celebration($('celebrate'));
 const onboard = new PW.Onboard($('onboard'));
 const VIEWS = { map: 'TV map', chase: 'Chase cam', onboard: 'Onboard' };
+const MODES = { race: 'Race view', ambient: 'Ambient', art: 'Live Art' };
+/* Wall display lock: the desktop app's display mode, or #display in the address for a kiosk browser.
+   Live Art only, no controls, no keys; the desktop app unlocks it with the owner's PIN. */
+const HOST = window.lapwall || null;
+const LOCK = !!(HOST && HOST.display) || /(^|[#&])display\b/.test(location.hash);
+/* Live Art camera director: wide map most of the time, cutting to chase and onboard shots of a close battle. */
+const art = { view: 'map', t: 0, car: -1, shot: 0, cut: null, cap: 0 };
+const ART_SHOTS = [['map', 48], ['chase', 20], ['map', 40], ['onboard', 16]];
+const curView = () => S.mode === 'art' ? art.view : S.view;
 /* The car the cameras follow: your chosen driver, or the leader if that car is out or not in this race. */
 function camCar() {
-  const c = S.camCar >= 0 ? race.cars.find(x => x.i === S.camCar) : null;
+  const want = S.mode === 'art' ? art.car : S.camCar;
+  const c = want >= 0 ? race.cars.find(x => x.i === want) : null;
   return c && !c.cleared ? c : race.running()[0] || race.cars[0];
 }
 let nextDrive = performance.now() + 45000;
@@ -87,7 +108,8 @@ function newRace(def) {
   $('cname').textContent = def.name; $('aname').textContent = def.name; $('aplace').textContent = def.place || kind;
   $('alen').textContent = (C.L / 1000).toFixed(3) + ' km'; $('acorn').textContent = C.corners.length; $('alaps').textContent = S.laps;
   nextDef = pickNext(def);
-  msgs = []; renderTicker(); buildRows(); layout(); drawLocator();
+  msgs = []; renderTicker(); buildRows(); layout(); drawLocator(); artCaption();
+  art.view = 'map'; art.shot = 0; art.t = 0; art.cut = null;
   const nx = PW.weekendNext && PW.weekendNext();
   $('anext-wrap').hidden = !nx && !wk;
   $('anext').textContent = wk ? 'This weekend · ' + wk.place : nx ? `${nx.place} · in ${nx.days} day${nx.days === 1 ? '' : 's'}` : '';
@@ -100,10 +122,10 @@ function onEvent(type, d) {
   switch (type) {
     case 'pit':
       say(`${c.code} pits · ${PW.TYRES[d.tyre].n} · ${d.dur.toFixed(1)}s${d.slow ? ' · slow stop' : ''}`, d.slow ? 'sc' : '', fav);
-      if (S.pitcam && S.mode === 'race' && innerWidth >= 760) pitcam.push({ car: c, dur: d.dur, tyre: d.tyre, prevTyre: c.tyre, slow: d.slow, priority: fav });
+      if (S.pitcam && S.mode === 'race' && !LOCK && innerWidth >= 760) pitcam.push({ car: c, dur: d.dur, tyre: d.tyre, prevTyre: c.tyre, slow: d.slow, priority: fav });
       break;
-    case 'spin': say(`${c.code} spins at turn ${d.corner}!`, 'sc', fav); break;
-    case 'crash': say(`Crash! ${c.code} hits the barrier at turn ${d.corner}`, 'red', fav); banner('Crash', `${c.code} · turn ${d.corner}`, 'crash', 2.6); break;
+    case 'spin': say(`${c.code} spins at turn ${d.corner}!`, 'sc', fav); renderer.addMark(c.dist, c.lat); break;
+    case 'crash': renderer.addMark(c.dist, c.lat); say(`Crash! ${c.code} hits the barrier at turn ${d.corner}`, 'red', fav); banner('Crash', `${c.code} · turn ${d.corner}`, 'crash', 2.6); break;
     case 'out': say(`${c.code} is out of the race`, 'red', fav); break;
     case 'sc': say(d.reason === 'crash' ? 'Safety car deployed to clear the crash' : 'Safety car deployed · debris on track', 'sc'); banner('Safety car', 'No overtaking', 'sc', 2.4); break;
     case 'sc-in': say('Safety car in this lap', 'sc'); break;
@@ -323,12 +345,23 @@ function renderClock() {
   const h = d.getHours(), a = +S.dimFrom, b = +S.dimTo;
   const inWindow = a === b ? false : a < b ? h >= a && h < b : h >= a || h < b;
   document.body.classList.toggle('dim', !!S.nightDim && inWindow);
+  applyLight(d);
 }
+/* Floodlights follow the local time: dusk from about 6:30 pm, full night 8:30 pm to 5:30 am, golden light around sunrise and sunset. */
+function lightAt(d) {
+  if (S.light === 'day') return { night: 0, golden: 0 };
+  if (S.light === 'night') return { night: 1, golden: 0 };
+  const h = d.getHours() + d.getMinutes() / 60, ss = v => v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v);
+  const night = h >= 12 ? ss((h - 18.5) / 2) : 1 - ss((h - 5.5) / 2);
+  const golden = Math.max(Math.exp(-Math.pow((h - 18.3) / .9, 2)), Math.exp(-Math.pow((h - 6.8) / .9, 2)));
+  return { night, golden: golden * (1 - night * .7) };
+}
+function applyLight(d) { if (renderer.C) renderer.setLight(lightAt(d || new Date())); }
 
 // ---------- Layout ----------
 function drawLocator() {
   const d = C && C.def, el = $('locator');
-  el.hidden = !(d && typeof d.lat === 'number') || S.locator === 'off' || S.view !== 'map';
+  el.hidden = !(d && typeof d.lat === 'number') || S.locator === 'off' || curView() !== 'map' || S.mode === 'art';
   if (el.hidden) return;
   PW.drawLocator(el.querySelector('canvas'), d.lat, d.lon, d.hue || '#38c6ff');
   $('loccap').textContent = PW.fmtCoord(d.lat, d.lon);
@@ -342,10 +375,12 @@ function layout() {
   const row = narrow ? 24 : Math.max(16, Math.min(28, (H - 122 - 60) / 20));
   document.documentElement.style.setProperty('--row', row + 'px');
   let r;
-  if (S.mode === 'ambient') r = narrow ? { x: 16, y: H * .16, w: W - 32, h: H * .5 } : { x: W * .05, y: H * .1, w: W * .9, h: H * .62 };
+  if (S.mode === 'art') r = { x: W * .04, y: H * .06, w: W * .92, h: H * .88 };
+  else if (S.mode === 'ambient') r = narrow ? { x: 16, y: H * .16, w: W - 32, h: H * .5 } : { x: W * .05, y: H * .1, w: W * .9, h: H * .62 };
   else if (narrow) r = { x: 16, y: 150, w: W - 32, h: Math.max(140, H - 150 - (5 * row + 120)) };
   else r = { x: 290, y: 104, w: W - 290 - 36, h: H - 104 - 120 };
-  renderer.layout(W, H, DPR, r, { style: S.mapStyle, zoom: S.mapZoom, hires: S.view === 'chase' });
+  renderer.layout(W, H, DPR, r, { style: S.mapStyle, zoom: S.mapZoom, hires: curView() === 'chase' || S.mode === 'art' });
+  applyLight();
 }
 
 // ---------- Loop ----------
@@ -394,9 +429,11 @@ function frame(now) {
     }
     if (bannerT > 0) { bannerT -= dtR; if (bannerT <= 0) hideBanner(); }
   }
-  const onb = S.view === 'onboard' && phase !== 'garage';
+  if (S.mode === 'art' && !paused) direct(dtR);
+  const view = curView(), onb = view === 'onboard' && phase !== 'garage';
   $('onboard').hidden = !onb;
-  if (phase !== 'garage' && !onb) renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race' && S.view === 'map', fav: S.favTeam, cam: S.view === 'chase' ? camCar() : null });
+  const drift = S.mode === 'art' && view === 'map' ? { k: 1.03 + .03 * Math.sin(now / 47000), x: Math.sin(now / 61000) * innerWidth * .012, y: Math.cos(now / 53000) * innerHeight * .012 } : null;
+  if (phase !== 'garage' && !onb) renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race' && view === 'map', fav: S.mode === 'art' ? -2 : S.favTeam, cam: view === 'chase' ? camCar() : null, drift });
   if (onb) onboard.draw(race, camCar(), now, paused ? 0 : dtR);
   if (!driveBy.active && phase !== 'garage' && !paused) checkReminders(now);
   if (S.driveby && S.mode === 'ambient' && phase === 'race' && !driveBy.active && now > nextDrive) startDriveBy();
@@ -409,6 +446,36 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 let lightsOff = 0;
+
+// ---------- Live Art ----------
+/* Pick the closest fight in the top ten for the close-up shots. */
+function battleCar() {
+  const run = race.running().filter(c => !c.inPit && !c.finished);
+  let best = run[0], gap = Infinity;
+  for (let p = 1; p < Math.min(10, run.length); p++) { const g = run[p - 1].dist - run[p].dist; if (g > 0 && g < gap) { gap = g; best = run[p]; } }
+  return best ? best.i : -1;
+}
+function direct(dtR) {
+  const racing = phase === 'race' && race.state === 'racing';
+  if (art.cut) {                                         // a short dip to black between shots
+    art.cut.t += dtR; $('fader').classList.toggle('on', art.cut.t < .7);
+    if (art.cut.t > .65 && !art.cut.done) { art.cut.done = true; art.view = art.cut.to; art.car = battleCar(); document.body.classList.toggle('onboard', art.view === 'onboard'); layout(); }
+    if (art.cut.t > 1.4) art.cut = null;
+    return;
+  }
+  if (!racing) { if (art.view !== 'map') cutTo('map'); return; }
+  art.t += dtR;
+  const [, dur] = ART_SHOTS[art.shot];
+  if (art.t > dur) { art.shot = (art.shot + 1) % ART_SHOTS.length; art.t = 0; if (ART_SHOTS[art.shot][0] !== art.view) cutTo(ART_SHOTS[art.shot][0]); }
+}
+function cutTo(v) { if (!art.cut) art.cut = { to: v, t: 0, done: false }; }
+/* A museum-style caption that fades in for a few seconds when a race starts. */
+function artCaption() {
+  const el = $('artcap'); if (!el || !C) return;
+  el.querySelector('b').textContent = C.def.name; el.querySelector('span').textContent = C.def.place || (C.def.kind === 'real' ? 'Real-layout replica' : 'Original circuit');
+  el.classList.remove('show'); clearTimeout(art.cap); void el.offsetWidth;
+  if (S.mode === 'art') { el.classList.add('show'); art.cap = setTimeout(() => el.classList.remove('show'), 9000); }
+}
 
 // ---------- Zoom-by ----------
 function startDriveBy(board) {
@@ -437,32 +504,37 @@ function checkReminders(now) {
 
 function setView(v) {
   S.view = v; save(); $('bview').textContent = 'View: ' + VIEWS[v]; $('s-view').value = v;
-  document.body.classList.toggle('onboard', v === 'onboard'); layout(); drawLocator();
+  document.body.classList.toggle('onboard', curView() === 'onboard'); layout(); drawLocator();
 }
 
 // ---------- Controls ----------
 function setMode(m) {
-  S.mode = m; save(); document.body.classList.toggle('ambient', m === 'ambient');
-  $('bmode').textContent = m === 'ambient' ? 'Race view' : 'Ambient';
-  if (m === 'ambient') pitcam.clear();
-  layout();
+  S.mode = m; if (!LOCK) save();
+  document.body.classList.toggle('ambient', m === 'ambient'); document.body.classList.toggle('art', m === 'art');
+  $('bmode').textContent = 'Mode: ' + MODES[m];
+  if (m !== 'race') pitcam.clear();
+  art.view = 'map'; art.cut = null; art.t = 0; $('fader').classList.remove('on');
+  document.body.classList.toggle('onboard', curView() === 'onboard');
+  layout(); drawLocator(); artCaption();
 }
+const nextMode = () => { const k = Object.keys(MODES); return k[(k.indexOf(S.mode) + 1) % k.length]; };
 const nextRace = () => { round++; newRace(phase === 'race' && race.state !== 'done' ? pickNext(C.def) : nextDef); };
 async function fullscreen() {
   try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (e) {}
   try { await navigator.wakeLock?.request('screen'); } catch (e) {}
 }
 const openSettings = open => { $('settings').hidden = !open; if (open) { document.body.classList.remove('idle'); $('sclose').focus(); } };
-$('bmode').addEventListener('click', () => setMode(S.mode === 'ambient' ? 'race' : 'ambient'));
+$('bmode').addEventListener('click', () => setMode(nextMode()));
 $('bnext').addEventListener('click', nextRace);
 $('bview').addEventListener('click', () => { const k = Object.keys(VIEWS); setView(k[(k.indexOf(S.view) + 1) % k.length]); });
 $('bfull').addEventListener('click', fullscreen);
 $('bset').addEventListener('click', () => openSettings($('settings').hidden));
 $('sclose').addEventListener('click', () => openSettings(false));
 addEventListener('keydown', e => {
+  if (LOCK) { e.preventDefault(); return; }
   if (e.target.closest && e.target.closest('input, select')) return;
   const k = e.key.toLowerCase();
-  if (k === 'a') setMode(S.mode === 'ambient' ? 'race' : 'ambient');
+  if (k === 'a') setMode(nextMode());
   else if (k === 'n') nextRace();
   else if (k === 'c') openSettings($('settings').hidden);
   else if (k === 'f') fullscreen();
@@ -558,7 +630,7 @@ function syncForm() {
   $('s-rw').checked = R.water; $('s-rwm').value = R.waterMins; $('s-rs').checked = R.stretch; $('s-rsm').value = R.stretchMins;
   $('s-re').checked = R.eyes; $('s-rem').value = R.eyesMins; $('s-rc').value = R.custom || ''; $('s-rcm').value = R.customMins;
   $('s-weekend').checked = S.weekendSync; $('s-style').value = S.mapStyle; $('s-zoom').value = S.mapZoom;
-  $('s-format').value = S.format; $('s-view').value = S.view; $('s-loc').value = S.locator;
+  $('s-format').value = S.format; $('s-view').value = S.view; $('s-loc').value = S.locator; $('s-light').value = S.light;
   $('s-cam').innerHTML = '<option value="-1">Race leader</option>' + drivers().map((d, i) => `<option value="${i}">#${d.num} ${PW.esc(d.name)}</option>`).join('');
   $('s-cam').value = S.camCar; renderCupInfo(); renderCareer();
   fillTeams(); fillDrivers(); fillDriveCar(); fillPlayers(); renderSeason();
@@ -580,6 +652,7 @@ bind('s-format', el => { S.format = el.value; if (el.value !== 'elimination') S.
 bind('s-view', el => setView(el.value));
 bind('s-cam', el => { S.camCar = +el.value; });
 bind('s-loc', el => { S.locator = el.value; drawLocator(); });
+bind('s-light', el => { S.light = el.value; applyLight(); });
 function renderCupInfo() {
   const c = S.cup, D = drivers();
   $('s-cupinfo').textContent = S.format !== 'elimination' ? '' : !c ? 'Starts with the next race: the slowest quarter is knocked out each race until four drivers race the final.'
@@ -627,15 +700,47 @@ $('s-reset').addEventListener('click', () => { S = { ...structuredClone(PW.DEFAU
 // Send-a-Zoom-by opens next to this page on the web, or on the public site otherwise
 if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test(location.hostname)) $('bsend').href = PW.HOME + 'send.html';
 
+// ---------- Wall display lock ----------
+function setupLock() {
+  document.body.classList.add('locked');
+  $('settings').hidden = true;
+  addEventListener('contextmenu', e => e.preventDefault());
+  addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+  if (!HOST || !HOST.onAskPin) return;                    // a kiosk browser: reload without #display to leave
+  const pad = $('pinpad'), dots = $('pindots'), msg = $('pinmsg'); let pin = '', closeT;
+  const show = on => { pad.hidden = !on; pin = ''; dots.textContent = ''; msg.textContent = HOST.hasPin ? 'Enter the PIN to leave display mode' : 'No PIN is set. Press OK to leave display mode.'; clearTimeout(closeT); if (on) closeT = setTimeout(() => show(false), 30000); };
+  HOST.onAskPin(() => show(true));
+  pad.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const k = b.dataset.k; clearTimeout(closeT); closeT = setTimeout(() => show(false), 30000);
+    if (k === 'x') { show(false); return; }
+    if (k === 'b') pin = pin.slice(0, -1);
+    else if (k === 'ok') {
+      const r = await HOST.submitPin(pin); pin = '';
+      if (r && r.ok) { show(false); return; }
+      msg.textContent = r && r.wait ? `Too many tries. Wait ${r.wait} seconds.` : 'Wrong PIN';
+    } else if (pin.length < 12) pin += k;
+    dots.textContent = '•'.repeat(pin.length);
+  });
+}
+/* Unlicensed copies and the free web version say so, quietly, in Live Art. */
+(function watermark() {
+  const el = $('wm'); if (!el) return;
+  const lic = HOST && HOST.licence;
+  el.hidden = !!lic || !!CAP;
+  el.textContent = HOST ? 'Lapwall preview · unlicensed copy' : 'Lapwall · free web preview';
+})();
+
 // ---------- Boot ----------
 syncForm();
-newRace(S.rotation === 'single' ? pickNext(null) : pickNext(null));
-setMode(S.mode);
+if (LOCK) setupLock();
+newRace(pickNext(null));
+setMode(LOCK ? 'art' : S.mode);
 setView(S.view);
 document.fonts?.ready.then(() => layout());
-try { if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
+try { if (!CAP && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
 window.__pw = {
-  get race() { return race; }, get C() { return C; }, get phase() { return phase; },
+  get race() { return race; }, get C() { return C; }, get phase() { return phase; }, get round() { return round; },
   ff(s) { while (s > 0) { if (race.state !== 'grid') race.step(.05); s -= .05; } renderHUD(); },
   start() { lightsT = 99; },
   crash(i = 0) { const c = race.running()[i]; race.startCrash(c, Math.floor(PW.mod(c.dist, C.L) / C.ds)); },
