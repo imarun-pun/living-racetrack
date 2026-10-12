@@ -32,4 +32,4 @@ The dataset's own disclaimer applies: it is unofficial and not associated with t
 
 ## Fonts
 
-Saira, Saira Condensed and JetBrains Mono are loaded from Google Fonts under the SIL Open Font License 1.1.
+Saira, Saira Condensed and JetBrains Mono are bundled in `fonts/` (from the Fontsource packages) under the SIL Open Font License 1.1. License texts: `fonts/OFL-Saira.txt` (covers Saira and Saira Condensed) and `fonts/OFL-JetBrainsMono.txt`. They are served locally, so the app makes no requests to Google or any other third party.

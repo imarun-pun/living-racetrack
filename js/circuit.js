@@ -102,7 +102,9 @@ PW.parseTrackFile = function (text, fallbackName) {
   else if (j.type === 'Feature') { coords = { ll: fromGeom(j.geometry) }; props = j.properties || {}; }
   else if (j.type) coords = { ll: fromGeom(j) };
   else if (Array.isArray(j.points)) { coords = { xy: j.points }; props = j; }
-  if (!coords || !(coords.ll || coords.xy) || (coords.ll || coords.xy).length < 8) throw new Error('No track line with at least 8 points found in this file.');
+  if (!coords || !Array.isArray(coords.ll || coords.xy) || (coords.ll || coords.xy).length < 8) throw new Error('No track line with at least 8 points found in this file.');
+  if ((coords.ll || coords.xy).length > 20000) throw new Error('The track has more than 20,000 points. Simplify it first, for example on geojson.io.');
+  if (!(coords.ll || coords.xy).every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))) throw new Error('Some points are not numbers.');
   let pts;
   if (coords.ll) {
     let c = coords.ll; if (c[0][0] === c[c.length - 1][0] && c[0][1] === c[c.length - 1][1]) c = c.slice(0, -1);
@@ -111,7 +113,7 @@ PW.parseTrackFile = function (text, fallbackName) {
   } else pts = coords.xy.map(p => [+p[0], +p[1]]);
   let len = 0; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; len += Math.hypot(b[0] - a[0], b[1] - a[1]); }
   if (!(len > 500)) throw new Error('The track is shorter than 500 m. Check that coordinates are longitude/latitude or metres.');
-  const name = props.Location || props.name || props.Name || fallbackName || 'Custom track';
+  const name = String(props.Location || props.name || props.Name || fallbackName || 'Custom track').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40) || 'Custom track';
   return { id: 'custom-' + Date.now().toString(36), name, place: 'Imported layout', length: Math.round(props.length || len), hue: '#ff6fb1', kind: 'custom',
     pts: pts.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]) };
 };

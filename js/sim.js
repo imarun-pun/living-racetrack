@@ -155,7 +155,7 @@ PW.Race = class Race {
       }
       if (c.passT && (c.passT.dist < c.dist - 7 || mod(c.passT.dist - c.dist, L) > 20 || c.passT.out)) { c.passT = null; c.passCd = 2.5; }
       c.passCd -= dt;
-      c.drs = !!(ahead && this.state === 'racing' && !this.sc && !this.yellow && !c.inPit && lapIdx >= 1 && W.rain < .3 &&
+      c.drs = !!(ahead && this.state === 'racing' && !this.sc && !this.yellow && !c.inPit && lapIdx >= 2 && W.rain < .3 &&
         this.inDRS(s) && gap / Math.max(c.v, 1) < 1 && !ahead.inPit);
       if (c.drs) target *= 1.035;
       if (ahead && !c.inPit && !c.spin && !c.crash && this.state !== 'grid') {

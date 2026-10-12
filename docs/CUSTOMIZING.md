@@ -46,6 +46,10 @@ Every finished race adds points: 25, 18, 15, 12, 10, 8, 6, 4, 2, 1 for the top t
 
 In the web app, cars drive by in the ambient view every few minutes (turn it off under **Customize → Room**, press `D` to trigger one). The desktop app uses the same drivers and teams and is configured from its tray menu.
 
+## Pit-board reminders
+
+**Customize → Drive-bys and pit-board reminders.** Turn on *Drink water*, *Stretch break* or *Rest your eyes* and pick how often. *My own message* puts any short text (up to 28 characters) on the board, for example "Call Mom". *Drive-by speed* sets how long a car takes to cross the screen: 5, 9 or 14 seconds. Press `W` for a water reminder right now. In the desktop app the same reminders are set from the tray menu; your own message text comes from the Pit Wall settings.
+
 ## Teams
 
 Edit names and both livery colours in the Customize panel, or change the defaults in `PW.DEFAULT_TEAMS` in `js/data.js`. Driver codes and car numbers are in `PW.CODES` and `PW.NUMBERS`.

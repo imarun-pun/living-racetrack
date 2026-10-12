@@ -8,7 +8,11 @@ const KEY = 'pitwall-settings';
 // ---------- Settings ----------
 function load() {
   let s = structuredClone(PW.DEFAULT_SETTINGS);
-  try { const j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j) s = { ...s, ...j }; else if (localStorage.getItem('pitwall-mode') === 'ambient') s.mode = 'ambient'; } catch (e) {}
+  try { const j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j && typeof j === 'object') s = { ...s, ...j, reminders: { ...s.reminders, ...((j && j.reminders) || {}) } }; else if (localStorage.getItem('pitwall-mode') === 'ambient') s.mode = 'ambient'; } catch (e) {}
+  // imported tracks come back from storage: keep only well-formed ones
+  s.custom = Array.isArray(s.custom) ? s.custom.filter(t => t && typeof t.id === 'string' && Array.isArray(t.pts) && t.pts.length >= 8 && t.pts.length <= 20000 &&
+    t.pts.every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))).map(t => ({ ...t, kind: 'custom', name: String(t.name || 'Custom track').replace(/[<>]/g, '').slice(0, 40), hue: '#ff6fb1', length: +t.length || undefined })) : [];
+  if (!['race', 'ambient'].includes(s.mode)) s.mode = 'race';
   return s;
 }
 let S = load();
@@ -34,6 +38,7 @@ const garage = new PW.Garage($('garage'));
 const driveBy = new PW.DriveBy($('driveby'));
 let nextDrive = performance.now() + 45000;
 let C, race, TS = 3, phase = 'race', phaseT = 0, round = 1, lightsT = 0, hold = 1, paused = false, nextDef = null, fade = null;
+const pairT = {};
 let msgs = [], bannerT = 0, firstStart = true, pendT = 0, garageInfo = null, radioT = 0;
 
 function newRace(def) {
@@ -90,7 +95,7 @@ function onEvent(type, d) {
         puncture: pick(['I’ve got a puncture! Coming in.', 'Puncture, puncture! Bringing it home.']),
         sc: pick(['Safety car. Box, box, cheap stop.', 'Box under the safety car.'])
       }[d.kind] || 'Box, box.';
-      say(`${PW.esc(c.code)}: “${line}”`, 'radio', fav, 'RADIO');
+      say(`${c.code}: “${line}”`, 'radio', fav, 'RADIO');
       break;
     }
   }
@@ -100,7 +105,7 @@ function say(text, cls = '', fav = false, tag = null) {
   msgs = msgs.slice(0, 3); renderTicker();
 }
 function renderTicker() {
-  $('ticker').innerHTML = msgs.slice().reverse().map((m, k, a) => `<div class="msg ${m.cls}${k < a.length - 1 ? ' old' : ''}"><span class="t">${m.tag || 'L' + m.lap}</span><span>${m.text}</span></div>`).join('');
+  $('ticker').innerHTML = msgs.slice().reverse().map((m, k, a) => `<div class="msg ${m.cls}${k < a.length - 1 ? ' old' : ''}"><span class="t">${m.tag || 'L' + m.lap}</span><span>${PW.esc(m.text)}</span></div>`).join('');
 }
 function banner(text, sub, cls, secs) {
   const b = $('banner'); b.className = 'banner ' + cls; b.innerHTML = text + (sub ? `<small>${sub}</small>` : ''); b.hidden = false; bannerT = secs;
@@ -244,11 +249,14 @@ function frame(now) {
     }
     pitcam.update(dtR);
     if (race.pending && now - pendT > 2200) {
-      const p = race.pending; say(`${p.a.code} passes ${p.b.code} for P${p.p + 1}`, '', p.a.team === S.favTeam); race.pending = null; pendT = now;
+      const p = race.pending, pair = [p.a.i, p.b.i].sort().join('-');
+      if (!(pairT[pair] && now - pairT[pair] < 25000)) { say(`${p.a.code} passes ${p.b.code} for P${p.p + 1}`, '', p.a.team === S.favTeam); pairT[pair] = now; }
+      race.pending = null; pendT = now;
     }
     if (bannerT > 0) { bannerT -= dtR; if (bannerT <= 0) hideBanner(); }
   }
   if (phase !== 'garage') renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race', fav: S.favTeam });
+  if (!driveBy.active && phase !== 'garage' && !paused) checkReminders(now);
   if (S.driveby && S.mode === 'ambient' && phase === 'race' && !driveBy.active && now > nextDrive) startDriveBy();
   if (driveBy.active) driveBy.update(paused ? 0 : dtR);
   if (now - hudT > 200) { renderHUD(); hudT = now; }
@@ -261,13 +269,28 @@ function frame(now) {
 let lightsOff = 0;
 
 // ---------- Drive-by ----------
-function startDriveBy() {
-  const pool = race.cars.filter(c => !c.out);
-  const favs = pool.filter(c => c.team === S.favTeam);
-  const c = (favs.length && Math.random() < .5 ? favs : pool)[Math.floor(Math.random() * (favs.length && Math.random() < .5 ? favs.length : pool.length))] || pool[0];
-  const car = c || race.cars[0];
-  driveBy.start({ name: car.name, flag: car.flag, num: car.num, team: teams()[car.team], tyre: car.tyre, sound: false });
-  nextDrive = performance.now() + S.drivebyMins * 60000 * (.6 + Math.random() * .8);
+function startDriveBy(board) {
+  const pool = race.cars.filter(c => !c.out), favs = pool.filter(c => c.team === S.favTeam);
+  const list = favs.length && Math.random() < .5 ? favs : pool;
+  const car = list[Math.floor(Math.random() * list.length)] || race.cars[0];
+  driveBy.start({ name: car.name, flag: car.flag, num: car.num, team: teams()[car.team], tyre: car.tyre, sound: false,
+    seconds: PW.DRIVEBY_SPEEDS[S.drivebySpeed] || PW.DRIVEBY_SPEEDS.cruise, board });
+  if (!board) nextDrive = performance.now() + S.drivebyMins * 60000 * (.6 + Math.random() * .8);
+}
+/* Pit-board reminders: each kind keeps its own clock. */
+const remDue = {};
+function reminderBoard(kind) {
+  if (kind === 'custom') return { title: String(S.reminders.custom || '').toUpperCase().slice(0, 28), sub: 'Pit board from you', icon: 'star' };
+  return PW.REMINDERS[kind];
+}
+function checkReminders(now) {
+  const R = S.reminders;
+  const kinds = [['water', R.water, R.waterMins], ['stretch', R.stretch, R.stretchMins], ['eyes', R.eyes, R.eyesMins], ['custom', !!(R.custom && R.customMins > 0), R.customMins]];
+  for (const [k, on, mins] of kinds) {
+    if (!on) { delete remDue[k]; continue; }
+    if (!remDue[k]) { remDue[k] = now + mins * 60000; continue; }
+    if (now >= remDue[k]) { remDue[k] = now + mins * 60000; startDriveBy(reminderBoard(k)); return; }
+  }
 }
 
 // ---------- Controls ----------
@@ -297,6 +320,7 @@ addEventListener('keydown', e => {
   else if (k === 'f') fullscreen();
   else if (k === 'p') { paused = !paused; say(paused ? 'Paused' : 'Resumed'); }
   else if (k === 'd' && !driveBy.active) startDriveBy();
+  else if (k === 'w' && !driveBy.active) startDriveBy(PW.REMINDERS.water);
   else if (k === 'escape') openSettings(false);
 });
 let idleT;
@@ -306,7 +330,7 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(lay
 
 // ---------- Settings panel ----------
 function fillTrackSelect() {
-  const sel = $('s-single'), grp = (label, list) => list.length ? `<optgroup label="${label}">${list.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}</optgroup>` : '';
+  const sel = $('s-single'), grp = (label, list) => list.length ? `<optgroup label="${label}">${list.map(t => `<option value="${PW.esc(t.id)}">${PW.esc(t.name)}</option>`).join('')}</optgroup>` : '';
   sel.innerHTML = grp('Original circuits', PW.ORIGINAL_CIRCUITS) + grp('Real-layout replicas', PW.REAL_CIRCUITS || []) + grp('Imported', S.custom);
   sel.value = S.single;
 }
@@ -359,7 +383,10 @@ function syncForm() {
   $('s-laps').value = S.laps; $('s-pace').value = S.lapSeconds; $('s-weather').value = S.weather;
   $('s-incidents').checked = S.incidents; $('s-pitcam').checked = S.pitcam; $('s-garage').checked = S.garage;
   $('s-dim').checked = S.nightDim; $('s-from').value = S.dimFrom; $('s-to').value = S.dimTo;
-  $('s-driveby').checked = S.driveby;
+  $('s-driveby').checked = S.driveby; $('s-dbspeed').value = S.drivebySpeed;
+  const R = S.reminders;
+  $('s-rw').checked = R.water; $('s-rwm').value = R.waterMins; $('s-rs').checked = R.stretch; $('s-rsm').value = R.stretchMins;
+  $('s-re').checked = R.eyes; $('s-rem').value = R.eyesMins; $('s-rc').value = R.custom || ''; $('s-rcm').value = R.customMins;
   fillTeams(); fillDrivers(); renderSeason();
 }
 const bind = (id, fn, ev = 'change') => $(id).addEventListener(ev, e => { fn(e.target); save(); });
@@ -372,6 +399,12 @@ bind('s-incidents', el => { S.incidents = el.checked; race.opt.incidents = el.ch
 bind('s-pitcam', el => { S.pitcam = el.checked; if (!el.checked) pitcam.clear(); });
 bind('s-garage', el => { S.garage = el.checked; });
 bind('s-fav', el => { S.favTeam = +el.value; });
+bind('s-dbspeed', el => { S.drivebySpeed = el.value; });
+const remBind = (id, key, num) => bind(id, el => { S.reminders[key] = num ? +el.value : el.checked; delete remDue[key.replace(/Mins$/, '')]; });
+remBind('s-rw', 'water'); remBind('s-rwm', 'waterMins', true); remBind('s-rs', 'stretch'); remBind('s-rsm', 'stretchMins', true);
+remBind('s-re', 'eyes'); remBind('s-rem', 'eyesMins', true); remBind('s-rcm', 'customMins', true);
+bind('s-rc', el => { S.reminders.custom = el.value.replace(/[<>]/g, '').trim().slice(0, 28); }, 'input');
+$('s-rtest').addEventListener('click', () => { if (driveBy.active) return; const R = S.reminders; startDriveBy(R.custom && R.customMins > 0 ? reminderBoard('custom') : R.water ? PW.REMINDERS.water : undefined); });
 bind('s-driveby', el => { S.driveby = el.checked; nextDrive = performance.now() + 15000; });
 $('s-season-reset').addEventListener('click', () => { S.season = { pts: [], wins: [], races: 0 }; save(); renderSeason(); });
 bind('s-dim', el => { S.nightDim = el.checked; renderClock(); });
@@ -379,6 +412,7 @@ bind('s-from', el => { S.dimFrom = Math.max(0, Math.min(23, +el.value || 0)); re
 bind('s-to', el => { S.dimTo = Math.max(0, Math.min(23, +el.value || 0)); renderClock(); });
 $('s-import').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0], msg = $('s-imsg'); if (!f) return;
+  if (f.size > 5 * 1024 * 1024) { msg.className = 'hint err'; msg.textContent = 'That file is over 5 MB. Track files are usually under 200 KB.'; e.target.value = ''; return; }
   const rd = new FileReader();
   rd.onload = () => {
     try {

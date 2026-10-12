@@ -17,7 +17,9 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 | **Race view** | 20 cars, a live timing tower with flags, gaps and tyre compounds, start lights, DRS overtakes, fastest laps, team radio and a race feed. |
 | **Your drivers** | Put yourself and your friends on the grid: names, national flags (50 countries) and car numbers. |
 | **Season** | Every race scores points (25-18-15…, plus fastest lap). Standings carry over, so friends can race each other all season. |
-| **Drive-bys** | Every few minutes a full-size car with a driver's name and flag sweeps across the screen. The desktop app does it above your taskbar while you work. |
+| **Drive-bys** | A full-size car with a driver's name and flag drives across the screen, slowing down mid-screen so you can read it. The desktop app does it above your taskbar while you work. |
+| **Pit-board reminders** | Drink water, stretch, rest your eyes, or your own message, carried past on a pit board at the interval you choose. |
+| **Private by design** | No accounts, no tracking, no network requests. Settings stay on your device. See [SECURITY.md](SECURITY.md). |
 | **Incidents** | Spins with tyre smoke, crashes into the barrier with debris, yellow flags, safety cars, red flags with a standing restart, and punctures after contact. |
 | **Pit cam** | An overhead pit-box camera plays every stop in real time: crew, jacks, wheel change, release light and the stop clock. |
 | **Weather** | Dry, wet or a passing shower. Teams switch to intermediates when it rains and back to slicks as it dries. |
@@ -56,7 +58,7 @@ sudo reboot
 
 The Pi boots straight into Pit Wall in kiosk mode, hides the cursor and keeps the screen awake.
 
-**Desktop app (drive-bys above your taskbar):** Pit Wall also comes as a small Windows, macOS and Linux app. It opens the display in a window and lives in the system tray. Every few minutes a car with one of your drivers' names drives across the bottom of your screen, right above the taskbar, while you work. It never takes focus and clicks pass straight through it. Tray menu: *Drive by now*, how often (5, 15, 30 or 60 minutes), pause, engine sound, start at login.
+**Desktop app (drive-bys above your taskbar):** Pit Wall also comes as a small Windows, macOS and Linux app. It opens the display in a window and lives in the system tray. Every few minutes a car with one of your drivers' names drives across the bottom of your screen, right above the taskbar, while you work. It never takes focus and clicks pass straight through it. Tray menu: *Drive by now*, how often (5, 15, 30 or 60 minutes), drink-water, stretch, rest-your-eyes and custom-message reminders, pause, engine sound, start at login.
 
 Get the installer from the *Actions* tab: open **Build desktop app**, click **Run workflow**, and download *PitWall-windows-latest* (or macOS / Linux) from the finished run. To run it from source instead:
 
@@ -72,7 +74,7 @@ The installers are not code-signed yet, so Windows SmartScreen and macOS Gatekee
 
 ### Keys
 
-`A` ambient · `N` next race · `C` customize · `F` full screen · `P` pause · `D` drive-by · `Esc` close panel
+`A` ambient · `N` next race · `C` customize · `F` full screen · `P` pause · `D` drive-by · `W` water reminder · `Esc` close panel
 
 ## Project layout
 

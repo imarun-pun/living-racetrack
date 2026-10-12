@@ -36,10 +36,19 @@ PW.driverCode = name => {
 };
 /* Short display name: "A. Pun". */
 PW.shortName = name => { const p = String(name || '').trim().split(/\s+/); return p.length > 1 ? p[0][0] + '. ' + p.slice(1).join(' ') : p[0] || ''; };
-PW.resolveTeams = S => PW.DEFAULT_TEAMS.map((t, i) => ({ ...t, ...((S && S.teams && S.teams[i]) || {}) }));
+/* Saved settings are untrusted input: clamp every value to a known shape before it is used. */
+const hex = (v, d) => /^#[0-9a-fA-F]{6}$/.test(v) ? v : d;
+const txt = (v, d, n) => (typeof v === 'string' && v.trim() ? v.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n) : d);
+PW.resolveTeams = S => PW.DEFAULT_TEAMS.map((t, i) => {
+  const o = (S && Array.isArray(S.teams) && S.teams[i]) || {};
+  return { name: txt(o.name, t.name, 16), color: hex(o.color, t.color), color2: hex(o.color2, t.color2) };
+});
 PW.resolveDrivers = S => PW.DEFAULT_DRIVERS.map((d, i) => {
-  const o = { ...d, ...((S && S.drivers && S.drivers[i]) || {}) };
-  return { ...o, code: PW.driverCode(o.name) };
+  const o = (S && Array.isArray(S.drivers) && S.drivers[i]) || {};
+  const flag = typeof o.flag === 'string' && (o.flag === '' || (PW.FLAG_NAMES && PW.FLAG_NAMES[o.flag]) || /^[A-Z]{2}$/.test(o.flag)) ? o.flag : d.flag;
+  const num = Number.isInteger(+o.num) && +o.num >= 0 && +o.num <= 99 && o.num !== '' && o.num !== undefined ? +o.num : d.num;
+  const name = txt(o.name, d.name, 24);
+  return { name, flag, num, code: PW.driverCode(name) };
 });
 PW.POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 
@@ -102,5 +111,7 @@ PW.DEFAULT_SETTINGS = {
   season: { pts: [], wins: [], races: 0 },
   driveby: true,            // drive-by cars in ambient view
   drivebyMins: 4,
+  drivebySpeed: 'cruise',   // fast | cruise | parade
+  reminders: { water: true, waterMins: 60, stretch: false, stretchMins: 90, eyes: false, eyesMins: 30, custom: '', customMins: 0 },
   custom: []                // imported tracks
 };

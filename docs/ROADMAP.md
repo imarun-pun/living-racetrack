@@ -9,6 +9,8 @@ Living Racetrack starts as free software anyone can put on a screen, and grows i
 
 **v0.3:** your own drivers with names, flags and numbers; season championship; DRS zones; team radio; drive-by cars in ambient view; desktop tray app with drive-bys above the taskbar.
 
+**v0.4:** slower drive-bys that brake mid-screen; pit-board reminders (water, stretch, eyes, your own message); self-hosted fonts and a strict content security policy; desktop app hardening.
+
 ## Next features
 
 ### Make it yours
