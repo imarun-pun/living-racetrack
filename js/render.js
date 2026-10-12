@@ -91,6 +91,14 @@ PW.Renderer = class Renderer {
       const [lx, ly] = this.at(s + (k ? 0 : 60), -C.inside * (w * 1.6 + 6));
       g.font = `600 ${Math.max(9, w * .55)}px "JetBrains Mono", monospace`; g.fillStyle = hue; g.globalAlpha = .7; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(lab, lx, ly); g.globalAlpha = 1;
     });
+    // DRS zones along the outside edge
+    (C.drs || []).forEach(([a, b]) => {
+      const e = b < a ? b + L : b, side = -C.inside;
+      g.save(); g.setLineDash([6, 5]); g.strokeStyle = '#2fd780'; g.globalAlpha = .55; g.lineWidth = 2; g.lineCap = 'butt';
+      g.stroke(this.offPath(a, e, side * (w / 2 + 6), 5)); g.restore();
+      const [lx, ly] = this.at(a + 25, side * (w * 1.15 + 10));
+      g.font = `600 ${Math.max(8, w * .5)}px "JetBrains Mono", monospace`; g.fillStyle = '#2fd780'; g.globalAlpha = .75; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('DRS', lx, ly); g.globalAlpha = 1;
+    });
     const [sx, sy, sa] = this.at(0, 0); g.save(); g.translate(sx, sy); g.rotate(sa);
     const sq = w / 6; for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) { g.fillStyle = (r + c) % 2 ? '#0a0c10' : '#f2f4f8'; g.fillRect(-sq + r * sq, -w / 2 + c * sq, sq, sq); }
     g.restore();
@@ -164,15 +172,16 @@ PW.Renderer = class Renderer {
       race.order.forEach((c, p) => {
         if (c.out || c.cleared || !(p < 5 || view.fav === c.team || c.spin || c.crash)) return;
         let [x, y] = this.at(c.dist, -C.inside * (w * 1.35 + 8) + c.lat * latPx);
-        const t = `${p + 1} ${c.code}`, tw = ctx.measureText(t).width + 8, th = Math.max(14, w * .95);
+        const t = `${p + 1} ${c.code}`, th = Math.max(14, w * .95), fw = c.flag && PW.FLAG_NAMES[c.flag] ? th * .9 : 0, tw = ctx.measureText(t).width + 8 + (fw ? fw + 4 : 0);
         let yy = y;
         for (let k = 0; k < 6 && placed.some(r => Math.abs(r.x - x) < (r.w + tw) / 2 && Math.abs(r.y - yy) < th + 1); k++) yy += th + 2;
         placed.push({ x, y: yy, w: tw });
         if (yy !== y) { ctx.strokeStyle = 'rgba(238,242,248,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, yy - th / 2); ctx.stroke(); }
         y = yy;
         ctx.fillStyle = 'rgba(7,9,13,.85)'; ctx.fillRect(x - tw / 2, y - th / 2, tw, th);
-        ctx.fillStyle = c.spin || c.crash ? '#ffc21a' : c.color; ctx.fillRect(x - tw / 2, y - th / 2, 2, th);
-        ctx.fillStyle = '#eef2f8'; ctx.fillText(t, x + 1, y + .5);
+        ctx.fillStyle = c.spin || c.crash ? '#ffc21a' : c.drs ? '#2fd780' : c.color; ctx.fillRect(x - tw / 2, y - th / 2, 2, th);
+        if (fw) PW.drawFlag(ctx, c.flag, x - tw / 2 + 5, y - th * .3, fw, th * .6);
+        ctx.fillStyle = '#eef2f8'; ctx.fillText(t, x + (fw ? (fw + 4) / 2 : 0) + 1, y + .5);
       });
     }
     // rain

@@ -14,7 +14,10 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 
 | | |
 |---|---|
-| **Race view** | 20 cars, a live timing tower with gaps and tyre compounds, start lights, overtakes, fastest laps and a race feed. |
+| **Race view** | 20 cars, a live timing tower with flags, gaps and tyre compounds, start lights, DRS overtakes, fastest laps, team radio and a race feed. |
+| **Your drivers** | Put yourself and your friends on the grid: names, national flags (50 countries) and car numbers. |
+| **Season** | Every race scores points (25-18-15…, plus fastest lap). Standings carry over, so friends can race each other all season. |
+| **Drive-bys** | Every few minutes a full-size car with a driver's name and flag sweeps across the screen. The desktop app does it above your taskbar while you work. |
 | **Incidents** | Spins with tyre smoke, crashes into the barrier with debris, yellow flags, safety cars, red flags with a standing restart, and punctures after contact. |
 | **Pit cam** | An overhead pit-box camera plays every stop in real time: crew, jacks, wheel change, release light and the stop clock. |
 | **Weather** | Dry, wet or a passing shower. Teams switch to intermediates when it rains and back to slicks as it dries. |
@@ -22,10 +25,11 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 | **Ambient view** | A calm mode with a large clock and circuit details while the cars keep lapping quietly. |
 | **44 tracks** | 4 original circuits plus 40 real-layout replicas traced from open map data, named by location. |
 | **Your own tracks** | Import any circuit as a GeoJSON file, for example a local kart track drawn on geojson.io. |
-| **Customize** | Team names and liveries, favourite team highlight, race length, pace, weather, incidents, night dimming. |
+| **Customize** | Driver names, flags and numbers, team names and liveries, favourite team, race length, pace, weather, incidents, drive-bys, night dimming. |
 
 ![Pit cam](docs/screenshots/pitcam.png)
-![Garage break](docs/screenshots/garage.png)
+![Garage break with championship standings](docs/screenshots/garage.png)
+![Ambient view with a drive-by](docs/screenshots/ambient-driveby.png)
 
 ## Run it
 
@@ -52,27 +56,42 @@ sudo reboot
 
 The Pi boots straight into Pit Wall in kiosk mode, hides the cursor and keeps the screen awake.
 
+**Desktop app (drive-bys above your taskbar):** Pit Wall also comes as a small Windows, macOS and Linux app. It opens the display in a window and lives in the system tray. Every few minutes a car with one of your drivers' names drives across the bottom of your screen, right above the taskbar, while you work. It never takes focus and clicks pass straight through it. Tray menu: *Drive by now*, how often (5, 15, 30 or 60 minutes), pause, engine sound, start at login.
+
+Get the installer from the *Actions* tab: open **Build desktop app**, click **Run workflow**, and download *PitWall-windows-latest* (or macOS / Linux) from the finished run. To run it from source instead:
+
+```bash
+cd desktop
+npm install
+npm start
+```
+
+The installers are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper will ask you to confirm the first time.
+
 **GitHub Pages:** the included workflow publishes the site on every push to `main`. Turn it on under *Settings → Pages → Source: GitHub Actions*.
 
 ### Keys
 
-`A` ambient · `N` next race · `C` customize · `F` full screen · `P` pause · `Esc` close panel
+`A` ambient · `N` next race · `C` customize · `F` full screen · `P` pause · `D` drive-by · `Esc` close panel
 
 ## Project layout
 
 ```
 index.html              page structure
 css/style.css           visual design
-js/data.js              teams, drivers, tyres, original circuits, default settings
+js/data.js              teams, drivers, tyres, points, original circuits, default settings
+js/flags.js             50 national flags drawn on canvas
 js/tracks-real.js       real-layout track pack (generated)
 js/circuit.js           spline geometry, curvature, speed profile, corners, track import
 js/sim.js               race simulation: pace, traffic, pit stops, weather, incidents, flags
 js/render.js            canvas drawing: track, cars, weather, effects
 js/pitcam.js            pit-stop camera
 js/garage.js            garage break and the original car design
+js/driveby.js           drive-by car with name tag (web and desktop)
 js/main.js              app shell: race weekend loop, HUD, settings, controls
 tools/                  local server, single-file build, track converter
 install/                Raspberry Pi kiosk installer
+desktop/                Electron tray app: display window and drive-by overlay
 docs/                   origin record, roadmap, customization guide
 ```
 
@@ -80,7 +99,7 @@ docs/                   origin record, roadmap, customization guide
 
 Each circuit is smoothed into 1,600 evenly spaced samples. Curvature at each point sets a cornering speed limit, and forward and backward passes add acceleration and braking zones. That gives every track a realistic speed profile; simulated lap times land within a few seconds of real ones on the replica layouts.
 
-Each car has its own pace, tyre wear, and a little noise. Cars follow each other in corners and pass on straights. Gaps in the timing tower come from 40 timing points per lap, the same way real timing loops work. Incidents are more likely in corners, in the rain, and on slick tyres in the wet.
+Each car has its own pace, tyre wear, and a little noise. Cars follow each other in corners and pass on straights, with a DRS boost when they are within a second of the car ahead in a DRS zone. Gaps in the timing tower come from 40 timing points per lap, the same way real timing loops work. Incidents are more likely in corners, in the rain, and on slick tyres in the wet.
 
 Everything shown is a simulation. It is labelled as such on screen and never presented as live data.
 

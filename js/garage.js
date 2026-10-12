@@ -64,6 +64,8 @@ PW.drawCarSide = function (g, c1, c2, num, teamName, tyreC, spin) {
   });
 };
 
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+PW.esc = esc;
 PW.Garage = class Garage {
   constructor(wrap) { this.wrap = wrap; this.cv = wrap.querySelector('canvas'); this.ctx = this.cv.getContext('2d'); this.t = 0; this.active = false; }
   show(info) {
@@ -71,10 +73,13 @@ PW.Garage = class Garage {
     const q = s => this.wrap.querySelector(s);
     q('[data-team]').textContent = info.team.name;
     q('[data-team]').style.color = info.team.color;
-    q('[data-drivers]').textContent = `#${info.num} ${info.drivers.join(' · ')}`;
+    q('[data-drivers]').textContent = info.drivers.join('  ·  ');
     q('[data-specs]').innerHTML = PW.CAR_SPECS.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
     q('[data-fact]').textContent = info.fact;
     q('[data-why]').textContent = info.why;
+    q('[data-season]').textContent = info.seasonTitle || 'Championship';
+    q('[data-standings]').innerHTML = (info.standings || []).map(d =>
+      `<li><span class="b" style="background:${d.color}"></span>${d.flag && PW.FLAG_NAMES[d.flag] ? `<img src="${PW.flagURL(d.flag, 21, 14)}" alt="${PW.FLAG_NAMES[d.flag]}">` : '<span></span>'}<span class="n">${esc(d.name)}</span><span class="p">${d.pts}</span></li>`).join('');
   }
   hide() { this.active = false; this.wrap.hidden = true; }
   update(dtR, left, nextName) {

@@ -7,11 +7,12 @@ Living Racetrack starts as free software anyone can put on a screen, and grows i
 **v0.1 Pit Wall:** animated race, timing tower, start lights, safety car, podium, ambient view.
 **v0.2 (this version):** spins, crashes, red flags with standing restarts, punctures, pit cam, rain and tyre strategy, garage break with an original car, 40 real-layout replicas, track import, team livery editor, favourite team, night dimming, offline install, Raspberry Pi kiosk.
 
+**v0.3:** your own drivers with names, flags and numbers; season championship; DRS zones; team radio; drive-by cars in ambient view; desktop tray app with drive-bys above the taskbar.
+
 ## Next features
 
 ### Make it yours
 - **Phone remote.** A QR code on screen opens a control page: switch mode, pick a track, follow a team. No app store needed.
-- **Championship mode.** Points carry across races, with standings, a season story and title deciders.
 - **Predictions.** Pick a winner before lights out; a household leaderboard over the season.
 - **Follow cam.** Picture-in-picture zoom that follows your favourite car.
 - **Art styles.** Neon (current), blueprint, 1970s poster, watercolour, minimal line. Seasonal drops keep the wall fresh.

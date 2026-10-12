@@ -22,10 +22,10 @@ PW.Race = class Race {
     const teams = opt.teams;
     const order = teams.map((t, i) => i).sort(() => Math.random() - .5), teamPace = [];
     order.forEach((t, r) => teamPace[t] = 1 - r * .003 - Math.random() * .0025);
-    this.cars = PW.CODES.map((code, i) => {
-      const team = Math.floor(i / 2), start = this.weather.rain > .4 ? 'I' : (Math.random() < .5 ? 'S' : 'M');
+    this.cars = opt.drivers.map((d, i) => {
+      const code = d.code, team = Math.floor(i / 2), start = this.weather.rain > .4 ? 'I' : (Math.random() < .5 ? 'S' : 'M');
       const pace = teamPace[team] + rnd(-.0015, .0015);
-      return { i, code, num: PW.NUMBERS[i], team, color: teams[team].color, color2: teams[team].color2, pace, quali: pace + rnd(-.004, .004),
+      return { i, code, name: d.name, flag: d.flag, num: d.num, team, color: teams[team].color, color2: teams[team].color2, pace, quali: pace + rnd(-.004, .004),
         dist: 0, v: 0, lat: 0, latT: 0, gridLat: 0, yaw: 0, tyre: start, tyreLaps: 0,
         pitLap: Math.max(2, Math.round(this.laps * (start === 'S' ? rnd(.33, .48) : rnd(.48, .64)))), planDone: false,
         pitNext: false, inPit: false, stopped: false, stopT: 0, stopDur: 0,
@@ -58,7 +58,7 @@ PW.Race = class Race {
     const remain = this.laps - Math.floor(base / L);
     for (const c of run) {
       c.tyre = this.weather.rain > .4 ? 'I' : remain > this.laps * .5 ? 'H' : 'M'; c.tyreLaps = 0; c.planDone = true; c.pitNext = false;
-      c.inPit = false; c.stopped = false; c.puncture = false; c.lapStart = null; c.cp = Math.floor(c.dist / (L / CP)); c.cpT = this.t;
+      c.inPit = false; c.stopped = false; c.puncture = false; c.radioPit = false; c.lapStart = null; c.cp = Math.floor(c.dist / (L / CP)); c.cpT = this.t;
     }
     this.leaderCp.length = Math.max(0, Math.floor(base / (L / CP)) - 30);
     this.debris = []; this.sc = null; this.yellow = null; this.red = null;
@@ -99,7 +99,7 @@ PW.Race = class Race {
       // incidents
       if (this.state === 'racing' && this.opt.incidents && !this.sc && !c.inPit && !c.spin && !c.crash && !c.finished && c.v > 28 && Math.abs(C.K[i]) > 1 / 160 && this.t - this.startT > 20) {
         const slick = c.tyre !== 'I';
-        const rate = .00055 * (1 + 2 * W.rain) * (slick ? 1 + 5 * W.rain : 1) * (c.puncture ? 3 : 1);
+        const rate = .0004 * (1 + 2 * W.rain) * (slick ? 1 + 5 * W.rain : 1) * (c.puncture ? 3 : 1);
         if (Math.random() < rate * dt) Math.random() < .3 ? this.startCrash(c, i) : this.startSpin(c, i);
       }
       if (c.spin) {
@@ -118,10 +118,15 @@ PW.Race = class Race {
       // pit decisions
       if (this.state === 'racing' && !c.inPit && !c.finished && !c.crash) {
         const remain = this.laps - lapIdx - 1;
-        if (!c.planDone && lapIdx === c.pitLap - 1 && s > L * .85 && remain > 1) c.pitNext = true;
-        if (W.rain > .45 && c.tyre !== 'I' && remain > 1) c.pitNext = true;
-        if (W.rain < .12 && c.tyre === 'I' && remain > 2) c.pitNext = true;
-        if (c.puncture) c.pitNext = true;
+        let why = null;
+        if (!c.planDone && lapIdx === c.pitLap - 1 && s > L * .85 && remain > 1) why = 'plan';
+        if (W.rain > .45 && c.tyre !== 'I' && remain > 1) why = 'inters';
+        if (W.rain < .12 && c.tyre === 'I' && remain > 2) why = 'slicks';
+        if (c.puncture) why = 'puncture';
+        if (why || c.pitNext) {
+          if (!c.radioPit) { c.radioPit = true; this.emit('radio', { car: c, kind: why || 'sc' }); }
+          c.pitNext = true;
+        }
         if (c.pitNext && s > L * .915 && s < L * .99) { c.inPit = true; c.pitLapIdx = lapIdx + 1; c.boxS = L * (.006 + c.team * .0035); }
       }
       if (c.inPit) {
@@ -138,7 +143,7 @@ PW.Race = class Race {
           c.stopT += dt; target = 0; c.v = 0;
           if (c.stopT >= c.stopDur) { c.stopped = true; c.tyre = c.newTyre; c.tyreLaps = 0; c.puncture = false; }
         }
-        if (c.stopped && s > L * .065 && s < L * .5) { c.inPit = false; c.stopped = false; c.stopT = 0; c.pitNext = false; c.planDone = true; c.pitOut = this.t; }
+        if (c.stopped && s > L * .065 && s < L * .5) { c.inPit = false; c.stopped = false; c.stopT = 0; c.pitNext = false; c.planDone = true; c.pitOut = this.t; c.radioPit = false; }
       }
       // traffic
       let ahead = null, gap = Infinity;
@@ -150,6 +155,9 @@ PW.Race = class Race {
       }
       if (c.passT && (c.passT.dist < c.dist - 7 || mod(c.passT.dist - c.dist, L) > 20 || c.passT.out)) { c.passT = null; c.passCd = 2.5; }
       c.passCd -= dt;
+      c.drs = !!(ahead && this.state === 'racing' && !this.sc && !this.yellow && !c.inPit && lapIdx >= 1 && W.rain < .3 &&
+        this.inDRS(s) && gap / Math.max(c.v, 1) < 1 && !ahead.inPit);
+      if (c.drs) target *= 1.035;
       if (ahead && !c.inPit && !c.spin && !c.crash && this.state !== 'grid') {
         const blue = ahead.finished || ahead.dist < c.dist - L * .5 || ahead.spin || ahead.crash || ahead.puncture;
         if (this.sc && !blue) { if (gap < 24) target = Math.min(target, ahead.v * (gap < 14 ? .9 : 1)); }
@@ -157,7 +165,7 @@ PW.Race = class Race {
           const straight = Math.abs(C.K[i]) < 1 / 350;
           if (target > ahead.v * 1.002 && (straight || blue) && c.passCd <= 0) {
             c.passT = ahead; c.latT = ahead.lat > 0 ? -1.15 : 1.15;
-            if (this.opt.incidents && !blue && Math.random() < .025 && this.state === 'racing') {
+            if (this.opt.incidents && !blue && Math.random() < .012 && this.state === 'racing') {
               const victim = Math.random() < .5 ? c : ahead; victim.puncture = true;
               this.emit('contact', { a: c, b: ahead, victim });
             }
@@ -209,6 +217,10 @@ PW.Race = class Race {
     if (this.state === 'finished' && (this.running().every(c => c.finished) || this.t - this.finishAt > 150)) { this.state = 'done'; this.emit('done', {}); }
   }
 
+  inDRS(s) {
+    const L = this.C.L;
+    return this.C.drs.some(([a, b]) => PW.mod(s - a, L) <= PW.mod(b - a, L));
+  }
   startSpin(c, i) {
     c.spin = { t: 0, dur: rnd(4, 6), dir: Math.random() < .5 ? -1 : 1, side: -Math.sign(this.C.K[i]) || 1 };
     this.yellow = { s: c.dist, until: this.t + 12, corner: this.cornerAt(i) };

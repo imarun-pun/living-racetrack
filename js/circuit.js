@@ -77,8 +77,17 @@ PW.buildCircuit = function (def) {
   const corners = [];
   for (const p of peaks) { const last = corners[corners.length - 1]; if (last !== undefined && (p - last) * ds < 110) { if (Math.abs(Kr[p]) > Math.abs(Kr[last])) corners[corners.length - 1] = p; } else corners.push(p); }
   if (corners.length > 1 && (corners[0] + N - corners[corners.length - 1]) * ds < 110) corners.pop();
-  // pit straight must be long enough; otherwise shorten the pit lane window
-  return { def, L, ds, X: Xr, Y: Yr, K: Kr, V, T, corners, inside: Math.sign(turn) || 1 };
+  // DRS zones: the two longest straights of at least 400 m; activation starts a little after the corner exit
+  const runs = []; let rs = -1;
+  const startAt = (() => { for (let i = 0; i < N; i++) if (Math.abs(Kr[i]) >= 1 / 700) return i; return 0; })();
+  for (let k = 0; k <= N; k++) {
+    const i = (startAt + k) % N, straight = k < N && Math.abs(Kr[i]) < 1 / 700;
+    if (straight && rs < 0) rs = k; else if (!straight && rs >= 0) { runs.push([startAt + rs, k - rs]); rs = -1; }
+  }
+  runs.sort((a, b) => b[1] - a[1]);
+  const drs = (runs.filter(([, n]) => n * ds >= 400).length ? runs.filter(([, n]) => n * ds >= 400) : runs.filter(([, n]) => n * ds >= 200).slice(0, 1)).slice(0, 2)
+    .map(([i0, n]) => [((i0 % N) * ds + n * ds * .12) % L, ((i0 % N) * ds + n * ds - 40) % L]);
+  return { def, L, ds, X: Xr, Y: Yr, K: Kr, V, T, corners, drs, inside: Math.sign(turn) || 1 };
 };
 
 /* Turn an imported file into a circuit definition.

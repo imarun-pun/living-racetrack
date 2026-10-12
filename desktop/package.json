@@ -1,0 +1,30 @@
+{
+  "name": "pit-wall-desktop",
+  "productName": "Pit Wall",
+  "version": "0.3.0",
+  "description": "Pit Wall for your desktop: the race display in a window, plus cars that drive by above your taskbar.",
+  "main": "main.js",
+  "author": "Arun Pun",
+  "license": "SEE LICENSE IN ../LICENSE.md",
+  "private": true,
+  "scripts": {
+    "prepare-app": "node copy-app.mjs",
+    "start": "npm run prepare-app && electron .",
+    "dist": "npm run prepare-app && electron-builder"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.arunpun.pitwall",
+    "productName": "Pit Wall",
+    "copyright": "Copyright © 2026 Arun Pun",
+    "directories": { "output": "release" },
+    "files": ["main.js", "preload.js", "overlay.html", "app/**/*"],
+    "win": { "target": "nsis", "icon": "app/icons/icon-512.png" },
+    "nsis": { "oneClick": true, "artifactName": "PitWall-Setup-${version}.${ext}" },
+    "mac": { "target": "dmg", "category": "public.app-category.entertainment", "icon": "app/icons/icon-512.png", "artifactName": "PitWall-${version}.${ext}" },
+    "linux": { "target": "AppImage", "icon": "app/icons/icon-512.png", "artifactName": "PitWall-${version}.${ext}" }
+  }
+}

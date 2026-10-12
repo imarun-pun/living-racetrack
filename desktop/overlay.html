@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pit Wall drive-by</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800&display=swap">
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="c" hidden></canvas>
+<script src="app/js/data.js"></script>
+<script src="app/js/flags.js"></script>
+<script src="app/js/garage.js"></script>
+<script src="app/js/driveby.js"></script>
+<script>
+// Reads the same drivers and teams you set in Pit Wall (shared local storage), then sends one car past.
+const db = new PW.DriveBy(document.getElementById('c'));
+const settings = () => { try { return JSON.parse(localStorage.getItem('pitwall-settings') || '{}'); } catch (e) { return {}; } };
+let last = 0;
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (db.update(dt)) requestAnimationFrame(loop); else window.pitwall.done();
+}
+window.pitwall.onDrive(opts => {
+  const S = settings(), drivers = PW.resolveDrivers(S), teams = PW.resolveTeams(S);
+  const fav = typeof S.favTeam === 'number' && S.favTeam >= 0 ? S.favTeam : -1;
+  const pool = fav >= 0 && Math.random() < .5 ? [fav * 2, fav * 2 + 1] : drivers.map((d, i) => i);
+  const i = pool[Math.floor(Math.random() * pool.length)], d = drivers[i];
+  const tyres = ['S', 'M', 'H'];
+  db.start({ name: d.name, flag: d.flag, num: d.num, team: teams[Math.floor(i / 2)], tyre: tyres[Math.floor(Math.random() * 3)], sound: !!(opts && opts.sound) });
+  last = performance.now(); requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>

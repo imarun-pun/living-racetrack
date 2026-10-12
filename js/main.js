@@ -7,13 +7,14 @@ const KEY = 'pitwall-settings';
 
 // ---------- Settings ----------
 function load() {
-  let s = { ...PW.DEFAULT_SETTINGS };
+  let s = structuredClone(PW.DEFAULT_SETTINGS);
   try { const j = JSON.parse(localStorage.getItem(KEY) || 'null'); if (j) s = { ...s, ...j }; else if (localStorage.getItem('pitwall-mode') === 'ambient') s.mode = 'ambient'; } catch (e) {}
   return s;
 }
 let S = load();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
-const teams = () => PW.DEFAULT_TEAMS.map((t, i) => ({ ...t, ...((S.teams && S.teams[i]) || {}) }));
+const teams = () => PW.resolveTeams(S);
+const drivers = () => PW.resolveDrivers(S);
 const allTracks = () => [...PW.ORIGINAL_CIRCUITS, ...(PW.REAL_CIRCUITS || []), ...S.custom];
 function playlist() {
   const all = allTracks();
@@ -30,13 +31,15 @@ function pickNext(cur) {
 const renderer = new PW.Renderer($('track'));
 const pitcam = new PW.PitCam($('pitcam'));
 const garage = new PW.Garage($('garage'));
+const driveBy = new PW.DriveBy($('driveby'));
+let nextDrive = performance.now() + 45000;
 let C, race, TS = 3, phase = 'race', phaseT = 0, round = 1, lightsT = 0, hold = 1, paused = false, nextDef = null, fade = null;
-let msgs = [], bannerT = 0, firstStart = true, pendT = 0, garageInfo = null;
+let msgs = [], bannerT = 0, firstStart = true, pendT = 0, garageInfo = null, radioT = 0;
 
 function newRace(def) {
   C = PW.buildCircuit(def); renderer.setCircuit(C);
   TS = C.T / S.lapSeconds;
-  race = new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams() });
+  race = new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams(), drivers: drivers() });
   race.on(onEvent);
   phase = 'race'; phaseT = 0; lightsT = 0; hold = rnd(.6, 2.2); firstStart = true; fade = null;
   pitcam.clear(); garage.hide(); $('podium').hidden = true; hideBanner(); $('fader').classList.remove('on');
@@ -75,35 +78,69 @@ function onEvent(type, d) {
     case 'drying': say('The track is drying · slicks are coming back', 'wx'); break;
     case 'chequered': say(`Chequered flag · ${c.code} wins at ${C.def.name}`, 'red', fav); break;
     case 'done': showPodium(); break;
+    case 'radio': {
+      const pos = race.order.indexOf(c), T = PW.TYRES;
+      if (!(fav || pos < 6) || performance.now() - radioT < 9000) break;
+      radioT = performance.now();
+      const pick = a => a[Math.floor(Math.random() * a.length)];
+      const line = {
+        plan: pick(['Box, box. Box this lap.', 'Box this lap, box this lap.', 'Okay, box now. Plan A.']),
+        inters: pick(['Box for inters, box for inters.', 'It’s raining at the last corner. Box for inters.']),
+        slicks: pick(['Track is drying. Box for slicks.', 'Inters are done. Box this lap for slicks.']),
+        puncture: pick(['I’ve got a puncture! Coming in.', 'Puncture, puncture! Bringing it home.']),
+        sc: pick(['Safety car. Box, box, cheap stop.', 'Box under the safety car.'])
+      }[d.kind] || 'Box, box.';
+      say(`${PW.esc(c.code)}: “${line}”`, 'radio', fav, 'RADIO');
+      break;
+    }
   }
 }
-function say(text, cls = '', fav = false) {
-  msgs.unshift({ text, cls: cls + (fav ? ' fav' : ''), lap: race ? (race.state === 'grid' && !race.startT ? 0 : race.leaderLap()) : 0, at: performance.now() });
+function say(text, cls = '', fav = false, tag = null) {
+  msgs.unshift({ text, tag, cls: cls + (fav ? ' fav' : ''), lap: race ? (race.state === 'grid' && !race.startT ? 0 : race.leaderLap()) : 0, at: performance.now() });
   msgs = msgs.slice(0, 3); renderTicker();
 }
 function renderTicker() {
-  $('ticker').innerHTML = msgs.slice().reverse().map((m, k, a) => `<div class="msg ${m.cls}${k < a.length - 1 ? ' old' : ''}"><span class="t">L${m.lap}</span><span>${m.text}</span></div>`).join('');
+  $('ticker').innerHTML = msgs.slice().reverse().map((m, k, a) => `<div class="msg ${m.cls}${k < a.length - 1 ? ' old' : ''}"><span class="t">${m.tag || 'L' + m.lap}</span><span>${m.text}</span></div>`).join('');
 }
 function banner(text, sub, cls, secs) {
   const b = $('banner'); b.className = 'banner ' + cls; b.innerHTML = text + (sub ? `<small>${sub}</small>` : ''); b.hidden = false; bannerT = secs;
 }
 function hideBanner() { $('banner').hidden = true; bannerT = 0; }
 
+const flagImg = (code, w = 21, h = 14) => code && PW.FLAG_NAMES[code] ? `<img src="${PW.flagURL(code, w, h)}" alt="${PW.FLAG_NAMES[code]}">` : '<span></span>';
+function awardPoints() {
+  if (race.awarded) return; race.awarded = true;
+  const se = S.season || (S.season = { pts: [], wins: [], races: 0 });
+  race.finishOrder.forEach((c, p) => { if (p < 10) se.pts[c.i] = (se.pts[c.i] || 0) + PW.POINTS[p]; });
+  const fl = race.fl.car; if (fl && fl.finished && fl.fpos < 10) se.pts[fl.i] = (se.pts[fl.i] || 0) + 1;
+  if (race.finishOrder[0]) se.wins[race.finishOrder[0].i] = (se.wins[race.finishOrder[0].i] || 0) + 1;
+  se.races = (se.races || 0) + 1; save(); renderSeason();
+}
+function standings(n = 20) {
+  const se = S.season || { pts: [] }, D = drivers(), T = teams();
+  return D.map((d, i) => ({ ...d, i, pts: se.pts[i] || 0, wins: (se.wins || [])[i] || 0, color: T[Math.floor(i / 2)].color }))
+    .sort((a, b) => b.pts - a.pts || b.wins - a.wins || a.i - b.i).slice(0, n);
+}
 function showPodium() {
   phase = 'podium'; phaseT = 0; pitcam.clear(); hideBanner();
   const [p1, p2, p3] = race.finishOrder, T = teams();
   if (!p1) { phaseT = 12; return; }
-  $('pcode').textContent = p1.code; $('pteam').textContent = T[p1.team].name + ' · Winner';
+  awardPoints();
+  $('pcode').textContent = p1.code;
+  $('pteam').innerHTML = `<span class="name">${flagImg(p1.flag)}${PW.esc(p1.name)}</span>${PW.esc(T[p1.team].name)} · #${p1.num} · Winner`;
   $('pbar').style.background = p1.color; $('ptitle').textContent = `Chequered flag · ${C.def.name}`;
   const fl = race.fl.car;
-  $('places').innerHTML = [p2, p3].filter(Boolean).map((c, k) => `<div><span class="p">P${k + 2}</span><span class="bar" style="background:${c.color}"></span><span>${c.code}</span><span class="v">+${(c.ftime - p1.ftime).toFixed(3)}</span></div>`).join('') +
-    (fl ? `<div class="flrow"><span class="p">FL</span><span class="bar" style="background:${fl.color}"></span><span>${fl.code}</span><span class="v">${PW.fmtLap(race.fl.t)}</span></div>` : '') +
-    (race.cars.some(c => c.out) ? `<div><span class="p">DNF</span><span class="bar" style="background:var(--red)"></span><span>${race.cars.filter(c => c.out).map(c => c.code).join(' ')}</span><span class="v"></span></div>` : '');
+  $('places').innerHTML = [p2, p3].filter(Boolean).map((c, k) => `<div><span class="p">P${k + 2}</span><span class="bar" style="background:${c.color}"></span>${flagImg(c.flag)}<span>${PW.esc(PW.shortName(c.name))}</span><span class="v">+${(c.ftime - p1.ftime).toFixed(3)}</span></div>`).join('') +
+    (fl ? `<div class="flrow"><span class="p">FL</span><span class="bar" style="background:${fl.color}"></span>${flagImg(fl.flag)}<span>${PW.esc(PW.shortName(fl.name))}</span><span class="v">${PW.fmtLap(race.fl.t)}</span></div>` : '') +
+    (race.cars.some(c => c.out) ? `<div><span class="p">DNF</span><span class="bar" style="background:var(--red)"></span><span></span><span>${race.cars.filter(c => c.out).map(c => c.code).join(' ')}</span><span class="v"></span></div>` : '');
+  const lead = standings(1)[0];
+  $('pnext').dataset.season = lead ? `Championship leader: ${PW.shortName(lead.name)} · ${lead.pts} pts` : '';
   $('podium').hidden = false;
   const useFav = S.favTeam >= 0 && round % 2 === 0;
-  const ti = useFav ? S.favTeam : p1.team;
-  garageInfo = { team: T[ti], num: race.cars[ti * 2].num, drivers: [race.cars[ti * 2].code, race.cars[ti * 2 + 1].code],
-    fact: PW.FACTS[Math.floor(Math.random() * PW.FACTS.length)], why: useFav ? 'Your team' : 'Race winner', tyreC: PW.TYRES[p1.tyre].c };
+  const ti = useFav ? S.favTeam : p1.team, a = race.cars[ti * 2], b = race.cars[ti * 2 + 1];
+  garageInfo = { team: T[ti], num: ti === p1.team ? p1.num : a.num, drivers: [a, b].map(c => `#${c.num} ${c.name}`),
+    fact: PW.FACTS[Math.floor(Math.random() * PW.FACTS.length)], why: useFav ? 'Your team' : 'Race winner', tyreC: PW.TYRES[p1.tyre].c,
+    seasonTitle: `Championship · after ${S.season.races} race${S.season.races === 1 ? '' : 's'}`, standings: standings(6) };
 }
 
 // ---------- HUD ----------
@@ -112,8 +149,8 @@ function buildRows() {
   const rows = $('rows'); rows.innerHTML = ''; rowEls.clear();
   race.cars.forEach(c => {
     const el = document.createElement('div'); el.className = 'row';
-    el.innerHTML = `<span class="pos"></span><span class="bar" style="background:${c.color}"></span><span class="code">${c.code}</span><span class="gap"></span><span class="tyre"></span>`;
-    rows.appendChild(el); rowEls.set(c, { el, pos: el.children[0], bar: el.children[1], gap: el.children[3], tyre: el.children[4] });
+    el.innerHTML = `<span class="pos"></span><span class="bar" style="background:${c.color}"></span>${c.flag && PW.FLAG_NAMES[c.flag] ? `<img class="flag" src="${PW.flagURL(c.flag, 18, 12)}" alt="${PW.FLAG_NAMES[c.flag]}">` : '<span></span>'}<span class="code" title="${PW.esc(c.name)}">${c.code}</span><span class="gap"></span><span class="tyre"></span>`;
+    rows.appendChild(el); rowEls.set(c, { el, pos: el.children[0], bar: el.children[1], gap: el.children[4], tyre: el.children[5] });
   });
 }
 function renderHUD() {
@@ -127,7 +164,7 @@ function renderHUD() {
     r.gap.textContent = g; r.gap.className = 'gap' + (g === 'PIT' ? ' pit' : g === 'SPIN' ? ' spin' : '');
     r.tyre.style.borderColor = PW.TYRES[c.tyre].c; r.bar.style.background = c.color;
     r.el.classList.toggle('fl', race.fl.car === c); r.el.classList.toggle('lead', p === 0);
-    r.el.classList.toggle('out', c.out); r.el.classList.toggle('fav', c.team === S.favTeam); r.el.classList.toggle('punct', c.puncture);
+    r.el.classList.toggle('out', c.out); r.el.classList.toggle('fav', c.team === S.favTeam); r.el.classList.toggle('punct', c.puncture); r.el.classList.toggle('drs', !!c.drs && !c.inPit && race.state === 'racing');
     r.el.classList.toggle('gain', p < c.lastPos && race.state === 'racing');
     if (p !== c.lastPos && !c.shiftAt) c.shiftAt = now;
     if (c.shiftAt && now - c.shiftAt > 3000) { c.lastPos = p; c.shiftAt = 0; }
@@ -196,7 +233,7 @@ function frame(now) {
       }
     }
     if (phase === 'podium') {
-      phaseT += dtR; $('pnext').textContent = `Next: ${nextDef.name} in ${Math.max(0, Math.ceil(12 - phaseT))}s`;
+      phaseT += dtR; $('pnext').textContent = `${$('pnext').dataset.season ? $('pnext').dataset.season + ' · ' : ''}Next: ${nextDef.name} in ${Math.max(0, Math.ceil(12 - phaseT))}s`;
       if (phaseT > 12) {
         $('podium').hidden = true;
         if (S.garage && garageInfo) { phase = 'garage'; phaseT = 0; garage.show(garageInfo); } else { round++; newRace(nextDef); }
@@ -212,6 +249,8 @@ function frame(now) {
     if (bannerT > 0) { bannerT -= dtR; if (bannerT <= 0) hideBanner(); }
   }
   if (phase !== 'garage') renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race', fav: S.favTeam });
+  if (S.driveby && S.mode === 'ambient' && phase === 'race' && !driveBy.active && now > nextDrive) startDriveBy();
+  if (driveBy.active) driveBy.update(paused ? 0 : dtR);
   if (now - hudT > 200) { renderHUD(); hudT = now; }
   if (now - clockT > 1000) {
     renderClock(); clockT = now;
@@ -220,6 +259,16 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 let lightsOff = 0;
+
+// ---------- Drive-by ----------
+function startDriveBy() {
+  const pool = race.cars.filter(c => !c.out);
+  const favs = pool.filter(c => c.team === S.favTeam);
+  const c = (favs.length && Math.random() < .5 ? favs : pool)[Math.floor(Math.random() * (favs.length && Math.random() < .5 ? favs.length : pool.length))] || pool[0];
+  const car = c || race.cars[0];
+  driveBy.start({ name: car.name, flag: car.flag, num: car.num, team: teams()[car.team], tyre: car.tyre, sound: false });
+  nextDrive = performance.now() + S.drivebyMins * 60000 * (.6 + Math.random() * .8);
+}
 
 // ---------- Controls ----------
 function setMode(m) {
@@ -247,6 +296,7 @@ addEventListener('keydown', e => {
   else if (k === 'c') openSettings($('settings').hidden);
   else if (k === 'f') fullscreen();
   else if (k === 'p') { paused = !paused; say(paused ? 'Paused' : 'Resumed'); }
+  else if (k === 'd' && !driveBy.active) startDriveBy();
   else if (k === 'escape') openSettings(false);
 });
 let idleT;
@@ -262,15 +312,42 @@ function fillTrackSelect() {
 }
 function fillTeams() {
   const T = teams();
-  $('s-fav').innerHTML = '<option value="-1">None</option>' + T.map((t, i) => `<option value="${i}">${t.name}</option>`).join('');
+  $('s-fav').innerHTML = '<option value="-1">None</option>' + T.map((t, i) => `<option value="${i}">${PW.esc(t.name)}</option>`).join('');
   $('s-fav').value = S.favTeam;
-  $('s-teams').innerHTML = T.map((t, i) => `<div class="team-row"><input type="color" id="tc1-${i}" value="${t.color}" aria-label="${t.name} main colour"><input type="color" id="tc2-${i}" value="${t.color2}" aria-label="${t.name} second colour"><input type="text" id="tn-${i}" value="${t.name}" maxlength="16" aria-label="Team ${i + 1} name"></div>`).join('');
+  $('s-teams').innerHTML = T.map((t, i) => `<div class="team-row"><input type="color" id="tc1-${i}" value="${t.color}" aria-label="${PW.esc(t.name)} main colour"><input type="color" id="tc2-${i}" value="${t.color2}" aria-label="${PW.esc(t.name)} second colour"><input type="text" id="tn-${i}" value="${PW.esc(t.name)}" maxlength="16" aria-label="Team ${i + 1} name"></div>`).join('');
   T.forEach((t, i) => ['tc1', 'tc2', 'tn'].forEach(p => $(`${p}-${i}`).addEventListener('input', () => {
     S.teams = S.teams || [];
     S.teams[i] = { name: $(`tn-${i}`).value.trim() || PW.DEFAULT_TEAMS[i].name, color: $(`tc1-${i}`).value, color2: $(`tc2-${i}`).value };
     save(); applyTeams();
     if (p === 'tn') { const o = $('s-fav').options[i + 1]; if (o) o.textContent = S.teams[i].name; }
   })));
+}
+const flagOpts = PW.flagOptions().map(([c, n]) => `<option value="${c}">${n}</option>`).join('');
+function fillDrivers() {
+  const D = drivers(), T = teams();
+  $('s-drivers').innerHTML = D.map((d, i) => `<div class="drv-row"><span class="dot" style="background:${T[Math.floor(i / 2)].color}" title="${PW.esc(T[Math.floor(i / 2)].name)}"></span>` +
+    `<select id="df-${i}" aria-label="Driver ${i + 1} flag"><option value="">No flag</option>${flagOpts}</select>` +
+    `<input type="text" id="dn-${i}" value="${PW.esc(d.name)}" maxlength="24" aria-label="Driver ${i + 1} name">` +
+    `<input type="number" id="dnum-${i}" value="${d.num}" min="0" max="99" aria-label="Driver ${i + 1} number"></div>`).join('');
+  D.forEach((d, i) => {
+    $(`df-${i}`).value = d.flag || '';
+    ['df', 'dn', 'dnum'].forEach(p => $(`${p}-${i}`).addEventListener(p === 'df' ? 'change' : 'input', () => {
+      S.drivers = S.drivers || [];
+      S.drivers[i] = { name: $(`dn-${i}`).value.trim() || PW.DEFAULT_DRIVERS[i].name, flag: $(`df-${i}`).value, num: Math.max(0, Math.min(99, parseInt($(`dnum-${i}`).value, 10) || 0)) };
+      save(); applyDrivers(); renderSeason();
+    }));
+  });
+}
+function applyDrivers() {
+  const D = drivers();
+  race.opt.drivers = D;
+  race.cars.forEach(c => { const d = D[c.i]; c.name = d.name; c.code = d.code; c.flag = d.flag; c.num = d.num; });
+  buildRows(); renderHUD();
+}
+function renderSeason() {
+  const se = S.season || { races: 0 };
+  $('s-season').textContent = se.races ? `${se.races} race${se.races === 1 ? '' : 's'} so far. Points: 25-18-15-12-10-8-6-4-2-1, plus 1 for the fastest lap in the top ten.` : 'No races yet. Points start counting from the next chequered flag.';
+  $('s-standings').innerHTML = se.races ? standings(10).map(d => `<li><span class="b" style="background:${d.color}"></span>${flagImg(d.flag)}<span class="n">${PW.esc(d.name)}</span><span class="p">${d.pts}</span></li>`).join('') : '';
 }
 function applyTeams() {
   const T = teams();
@@ -282,7 +359,8 @@ function syncForm() {
   $('s-laps').value = S.laps; $('s-pace').value = S.lapSeconds; $('s-weather').value = S.weather;
   $('s-incidents').checked = S.incidents; $('s-pitcam').checked = S.pitcam; $('s-garage').checked = S.garage;
   $('s-dim').checked = S.nightDim; $('s-from').value = S.dimFrom; $('s-to').value = S.dimTo;
-  fillTeams();
+  $('s-driveby').checked = S.driveby;
+  fillTeams(); fillDrivers(); renderSeason();
 }
 const bind = (id, fn, ev = 'change') => $(id).addEventListener(ev, e => { fn(e.target); save(); });
 bind('s-rotation', el => { S.rotation = el.value; nextDef = pickNext(C.def); });
@@ -294,6 +372,8 @@ bind('s-incidents', el => { S.incidents = el.checked; race.opt.incidents = el.ch
 bind('s-pitcam', el => { S.pitcam = el.checked; if (!el.checked) pitcam.clear(); });
 bind('s-garage', el => { S.garage = el.checked; });
 bind('s-fav', el => { S.favTeam = +el.value; });
+bind('s-driveby', el => { S.driveby = el.checked; nextDrive = performance.now() + 15000; });
+$('s-season-reset').addEventListener('click', () => { S.season = { pts: [], wins: [], races: 0 }; save(); renderSeason(); });
 bind('s-dim', el => { S.nightDim = el.checked; renderClock(); });
 bind('s-from', el => { S.dimFrom = Math.max(0, Math.min(23, +el.value || 0)); renderClock(); });
 bind('s-to', el => { S.dimTo = Math.max(0, Math.min(23, +el.value || 0)); renderClock(); });
@@ -317,7 +397,7 @@ $('s-clear').addEventListener('click', () => {
   S.custom = []; if (S.rotation === 'custom' || (S.rotation === 'single' && S.single.startsWith('custom-'))) { S.rotation = 'all'; S.single = PW.ORIGINAL_CIRCUITS[0].id; }
   save(); syncForm(); $('s-imsg').className = 'hint'; $('s-imsg').textContent = 'Imported tracks removed.';
 });
-$('s-reset').addEventListener('click', () => { S = { ...PW.DEFAULT_SETTINGS, mode: S.mode }; save(); syncForm(); applyTeams(); round++; newRace(pickNext(null)); });
+$('s-reset').addEventListener('click', () => { S = { ...structuredClone(PW.DEFAULT_SETTINGS), mode: S.mode }; save(); syncForm(); applyTeams(); round++; newRace(pickNext(null)); });
 
 // ---------- Boot ----------
 syncForm();

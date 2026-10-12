@@ -15,8 +15,33 @@ PW.DEFAULT_TEAMS = [
   { name: 'Granite',    color: '#4f7dff', color2: '#e8ecf4' }
 ];
 
-PW.CODES = ['VAL','KOR','MEI','ADE','SOL','BRK','FIN','OKA','LUN','RAV','TAN','DUV','IKE','MOR','QUI','ZEL','NAV','WEX','YUR','CAS'];
-PW.NUMBERS = [7, 12, 19, 23, 4, 41, 9, 66, 15, 30, 52, 8, 26, 71, 3, 88, 21, 14, 37, 60];
+/* Twenty fictional drivers; slot i drives for team floor(i / 2). Names, flags and numbers are editable in the app. */
+PW.DEFAULT_DRIVERS = [
+  { name: 'Luca Valenti',     flag: 'IT', num: 7 },  { name: 'Mika Korhonen',    flag: 'FI', num: 12 },
+  { name: 'Daniel Meier',     flag: 'CH', num: 19 }, { name: 'Tobi Adeyemi',     flag: 'NG', num: 23 },
+  { name: 'Andrés Solano',    flag: 'ES', num: 4 },  { name: 'Oliver Brookes',   flag: 'GB', num: 41 },
+  { name: 'Liam Finnegan',    flag: 'IE', num: 9 },  { name: 'Ren Okada',        flag: 'JP', num: 66 },
+  { name: 'Sofia Lund',       flag: 'SE', num: 15 }, { name: 'Arjun Ravi',       flag: 'IN', num: 30 },
+  { name: 'Theo Tan',         flag: 'SG', num: 52 }, { name: 'Hugo Duval',       flag: 'FR', num: 8 },
+  { name: 'Jake Ikerd',       flag: 'US', num: 26 }, { name: 'Mateo Moreno',     flag: 'MX', num: 71 },
+  { name: 'Rafael Quintana',  flag: 'BR', num: 3 },  { name: 'Max Zeller',       flag: 'DE', num: 88 },
+  { name: 'Pablo Navarro',    flag: 'AR', num: 21 }, { name: 'Ethan Wexford',    flag: 'AU', num: 14 },
+  { name: 'Leo Yurek',        flag: 'PL', num: 37 }, { name: 'Diego Castro',     flag: 'PT', num: 60 }
+];
+/* Three-letter timing code from the surname, e.g. "Arun Pun" -> "PUN". */
+PW.driverCode = name => {
+  const parts = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().split(/\s+/);
+  const last = (parts[parts.length - 1] || 'DRV').replace(/[^A-Za-z]/g, '');
+  return (last.length >= 3 ? last : (parts.join('') + 'XXX')).slice(0, 3).toUpperCase();
+};
+/* Short display name: "A. Pun". */
+PW.shortName = name => { const p = String(name || '').trim().split(/\s+/); return p.length > 1 ? p[0][0] + '. ' + p.slice(1).join(' ') : p[0] || ''; };
+PW.resolveTeams = S => PW.DEFAULT_TEAMS.map((t, i) => ({ ...t, ...((S && S.teams && S.teams[i]) || {}) }));
+PW.resolveDrivers = S => PW.DEFAULT_DRIVERS.map((d, i) => {
+  const o = { ...d, ...((S && S.drivers && S.drivers[i]) || {}) };
+  return { ...o, code: PW.driverCode(o.name) };
+});
+PW.POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 
 PW.TYRES = {
   S: { c: '#ff3b3b', base: 1.006,  deg: .0028, n: 'Softs' },
@@ -73,5 +98,9 @@ PW.DEFAULT_SETTINGS = {
   nightDim: false,
   dimFrom: 23, dimTo: 7,
   teams: null,              // overrides for name/color
+  drivers: null,            // overrides for name/flag/num per slot
+  season: { pts: [], wins: [], races: 0 },
+  driveby: true,            // drive-by cars in ambient view
+  drivebyMins: 4,
   custom: []                // imported tracks
 };

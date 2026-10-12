@@ -63,9 +63,11 @@
     <div class="g-info">
       <div><div class="eyebrow">Team</div><h2 data-team>Team</h2><div class="drivers" data-drivers></div></div>
       <dl class="specs" data-specs></dl>
+      <div class="standings"><div class="eyebrow" data-season>Championship</div><ol data-standings></ol></div>
       <p class="fact"><b>DID YOU KNOW</b><span data-fact></span></p>
     </div>
   </section>
+  <canvas class="driveby" id="driveby" hidden aria-hidden="true"></canvas>
   <div class="fader" id="fader"></div>
   <nav class="controls" aria-label="Display controls">
     <button id="bmode" type="button">Ambient</button>
@@ -101,6 +103,17 @@
       <label class="field check"><input type="checkbox" id="s-garage"> Garage break between races</label>
     </fieldset>
     <fieldset>
+      <legend>Drivers</legend>
+      <p class="hint">Put yourself and your friends on the grid. Two drivers per team; the timing code comes from the surname.</p>
+      <div class="drivers" id="s-drivers"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Season</legend>
+      <p class="hint" id="s-season">No races yet.</p>
+      <ol class="season-list" id="s-standings"></ol>
+      <button type="button" id="s-season-reset">Start a new season</button>
+    </fieldset>
+    <fieldset>
       <legend>Teams</legend>
       <label class="field">Favourite team <select id="s-fav"></select></label>
       <div class="teams" id="s-teams"></div>
@@ -108,22 +121,25 @@
     </fieldset>
     <fieldset>
       <legend>Room</legend>
+      <label class="field check"><input type="checkbox" id="s-driveby"> Cars drive by in ambient view</label>
       <label class="field check"><input type="checkbox" id="s-dim"> Dim the display at night</label>
       <label class="field">Dim between <span style="display:flex;gap:6px;align-items:center"><input type="number" id="s-from" min="0" max="23"> and <input type="number" id="s-to" min="0" max="23"></span></label>
-      <p class="hint">Keys: <kbd>A</kbd> ambient · <kbd>N</kbd> next race · <kbd>C</kbd> customize · <kbd>F</kbd> full screen · <kbd>P</kbd> pause</p>
+      <p class="hint">Keys: <kbd>A</kbd> ambient · <kbd>N</kbd> next race · <kbd>C</kbd> customize · <kbd>F</kbd> full screen · <kbd>P</kbd> pause · <kbd>D</kbd> drive-by</p>
       <button type="button" id="s-reset">Reset everything</button>
     </fieldset>
-    <p class="hint">Teams, drivers and the four original circuits are fictional. Real layouts are traced from open map data and named by location. Not affiliated with any racing series.</p>
+    <p class="hint">Default teams, drivers and the four original circuits are fictional. Real layouts are traced from open map data and named by location. Not affiliated with any racing series.</p>
   </aside>
 </div>
 <!--BODY-END-->
 <script src="js/data.js"></script>
+<script src="js/flags.js"></script>
 <script src="js/tracks-real.js"></script>
 <script src="js/circuit.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/render.js"></script>
 <script src="js/pitcam.js"></script>
 <script src="js/garage.js"></script>
+<script src="js/driveby.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
