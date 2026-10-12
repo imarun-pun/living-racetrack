@@ -545,7 +545,13 @@ if (STREAMING) {
     state() {
       const lead = race.running()[0];
       return { id: raceId, track: C.def.name, state: race.state, lap: race.startT === undefined ? 0 : race.leaderLap(), laps: race.laps, picksOpen: picksOpen(),
-        seats: [...viewers].map(([k, v]) => { const c = race.cars.find(x => x.i === v.slot); return { key: k, name: v.name, platform: v.platform, slot: v.slot, num: c ? c.num : 0, pos: c ? race.order.indexOf(c) + 1 : 0, color: c ? c.color : '#888', mode: c ? c.mode : '' }; }),
+        seats: [...viewers].map(([k, v]) => {
+          const c = race.cars.find(x => x.i === v.slot), p = c ? race.order.indexOf(c) : -1, ahead = p > 0 ? race.order[p - 1] : null, ty = c && PW.TYRES[c.tyre];
+          return { key: k, name: v.name, platform: v.platform, slot: v.slot, num: c ? c.num : 0, pos: p + 1, color: c ? c.color : '#888', mode: c ? c.mode : '',
+            gap: c && ahead && !c.out ? +((ahead.dist - c.dist) / Math.max(20, c.v)).toFixed(1) : null, tyre: c ? c.tyre : '', wear: c && ty ? Math.max(0, Math.round(100 - (c.wear || 0) * ty.deg * 2200)) : 100,
+            boost: !!c && race.state === 'racing' && c.boostLap !== Math.floor(c.dist / C.L) && !c.inPit, boosting: !!c && c.boostT > 0, box: !!c && (c.pitNext || c.inPit), out: !!c && c.out, done: !!c && c.finished };
+        }),
+        top: race.order.slice(0, 10).map(c => [c.code, c.name, c.color, viewerAt(c.i)]),
         leader: lead ? lead.code : '' };
     },
     on(fn) { streamListeners.push(fn); },

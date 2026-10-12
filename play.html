@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Race on the stream · Lapwall</title>
+<meta name="description" content="Put your name on a car in the live Lapwall race and call its strategy from your phone.">
+<meta name="theme-color" content="#07090d">
+<meta property="og:title" content="Get a car in the live race">
+<meta property="og:description" content="Put your name on a car and call its strategy from your phone: push, save tyres, box, boost.">
+<meta property="og:image" content="https://imarun-pun.github.io/living-racetrack/icons/og-driveby.png">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://ntfy.sh; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/play.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="top"><div class="eyebrow">Lapwall · live race</div></header>
+
+  <section class="card" id="joinCard">
+    <h1>Get a car in the race</h1>
+    <p class="muted">Type your name. It goes on a car in the race on the stream, and you become its pit wall: push, save the tyres, call the pit stop, fire the boost.</p>
+    <form id="joinForm" autocomplete="off">
+      <input type="text" id="name" maxlength="20" placeholder="Your name" required aria-label="Your name">
+      <button class="primary" type="submit">Join the race</button>
+    </form>
+    <p class="muted small">Your name is shown on the stream. Keep it friendly.</p>
+    <p class="msg" id="joinMsg"></p>
+  </section>
+
+  <section class="card" id="carCard" hidden>
+    <div class="eyebrow">Your car · watch for <b id="who"></b> on the stream</div>
+    <div class="modes">
+      <button type="button" data-cmd="push">Push</button>
+      <button type="button" data-cmd="normal" aria-pressed="true">Normal</button>
+      <button type="button" data-cmd="save">Save tyres</button>
+    </div>
+    <div class="big">
+      <button type="button" data-cmd="box" class="box">Box this lap</button>
+      <button type="button" data-cmd="boost" class="boost">⚡ Boost</button>
+    </div>
+    <p class="muted small">Push is faster but wears the tyres and risks a spin. Box for fresh tyres when they fade. Boost works once a lap.</p>
+    <div class="row"><button type="button" id="change">Change name</button><button type="button" id="leave">Give car back</button></div>
+  </section>
+
+  <section class="card">
+    <div class="eyebrow">Pick the winner · +5 points if you are right · before lap 2</div>
+    <form id="pickForm" class="pickrow" autocomplete="off">
+      <input type="text" id="pick" maxlength="20" placeholder="Code from the stream, e.g. VAL" aria-label="Driver code">
+      <button type="submit">Pick</button>
+    </form>
+  </section>
+  <p class="msg" id="msg" aria-live="polite"></p>
+  <p class="foot muted">This page only sends your name and your calls to the stream, through ntfy.sh. Nothing else is collected.</p>
+</main>
+<script src="js/live.js"></script>
+<script src="js/play.js"></script>
+</body>
+</html>

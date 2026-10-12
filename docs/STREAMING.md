@@ -1,43 +1,24 @@
-# Streaming Lapwall on Kick, YouTube and Twitch
+# Streaming Lapwall on Kick or YouTube
 
-The **Stream Studio** (`stream.html`) turns your stream into a race your chat drives. Viewers type commands in chat; Lapwall gives them cars with their names on, and they call their own strategy live.
+Share the race on your stream and let viewers take cars from their phones. No chat bots, no keys, no sign-ups.
 
-## Set it up in OBS (or Streamlabs)
+## How it works
 
-1. Add a **Browser Source**: URL `https://imarun-pun.github.io/living-racetrack/stream.html`, width **1920**, height **1080**.
-2. Right-click the source → **Interact**, hover the bottom-right corner and click **Settings**:
-   - **Kick:** your chatroom ID. Open `kick.com/api/v2/channels/YOURNAME` in a browser and find `"chatroom":{"id":…`.
-   - **YouTube:** the live video ID (the part after `watch?v=`) and a YouTube Data API v3 key from Google Cloud Console. Reading chat uses API quota; the free quota covers a few hours a day.
-   - **Twitch:** your channel name. No key needed.
-3. Click **Connect**. The connection status shows bottom-left. **Test with fake chat** lets you try it before going live.
+1. Open **stream.html** (Play → Stream Studio) on the computer you stream from.
+2. Capture that browser window in OBS, or share the screen. 1920 × 1080 looks best. OBS's Browser Source works too.
+3. Hover the bottom-right corner → **Settings** → **Copy** the join link and paste it into your Kick or YouTube chat. The QR code on screen opens the same link.
+4. Viewers open the link on their phone, type a name and tap **Join the race**. Their name goes on a car straight away, and the stream shows "Max takes car #12".
+5. From their phone they run their car's strategy: **Push**, **Normal**, **Save tyres**, **Box this lap**, **⚡ Boost** (once a lap). They can also **pick the winner** before lap 2 by typing a driver code from the screen.
 
-Prefer no clicking? Put the settings in the address (keep it private, it contains your key):
-`stream.html#kick=1234567&twitch=yourname&yt=VIDEOID&ytkey=YOURKEY`
+Viewers score 25-18-15-12-10-8-6-4-2-1 for where their car finishes, plus 5 for calling the winner. The viewer championship stays on screen across races. Sprint races (6 laps, about 3 minutes) work best; set it in Settings.
 
-## Chat commands
+## Good to know
 
-| Command | What it does |
-|---|---|
-| `!join` | Take a car. Your name goes on it straight away. 20 cars; a seat frees up if its owner is quiet for 10 minutes. |
-| `!push` | Faster, but the tyres wear quicker and mistakes are likelier |
-| `!save` | Slower, kinder to the tyres, safer |
-| `!normal` | Back to normal pace |
-| `!box` | Pit this lap for fresh tyres |
-| `!boost` | Overtake boost, once a lap |
-| `!pick CODE` | Predict the winner (driver code, car number or name) before the end of lap 1 |
-| `!leave` | Give your car back |
+- **20 cars.** A seat frees up when its owner has been quiet for 10 minutes or gives the car back.
+- **Moderation.** Settings → *Drivers in this room* lists everyone; **Remove** takes a car back and ignores that phone.
+- **New link.** Settings → *New link* starts a fresh room; old links stop working.
+- **Try it first.** Settings → *Open a test phone* opens the phone page in a new tab. For a fully offline test, open `stream.html#test`; test phones then only work in tabs of the same browser.
 
-## The chat championship
+## How the phones reach your stream
 
-Viewers score 25-18-15-12-10-8-6-4-2-1 for where their car finishes, plus 5 for calling the winner. The table stays on screen across races and is saved in OBS's browser until you reset it in Settings. Sprint races (6 laps, about 3 minutes) work best for chat.
-
-## Ideas for stream formats
-
-- **Chat Grand Prix:** an evening of sprints, crown the chat champion at the end.
-- **Elimination night:** set *Customize → Format → Elimination Cup*: the slowest quarter is knocked out each race.
-- **Streamer vs chat:** play Story mode in another window, or race your own car with the pit-wall keys (1 2 3 B O), while chat runs the rest of the grid.
-- **World Race watch-along:** switch to *Play → World Race* and react to the same race your viewers can open on their own phones.
-
-## Privacy and safety
-
-Only the Stream Studio page connects to the internet, and only to read chat: YouTube's API, Kick's chat socket and Twitch's chat socket. It never posts to chat. Names and messages are shown as plain text, never as HTML, and each viewer can send one command every 1.5 seconds. Your key stays in this browser.
+Phones send their calls through [ntfy.sh](https://ntfy.sh), a free, open-source message service that needs no account. Each room is a random, unguessable channel. Messages only go one way, phone to stream, and only carry a name, a random phone ID and the call. Lapwall itself stores nothing online. If ntfy.sh is ever down, live join pauses and the race keeps running.
