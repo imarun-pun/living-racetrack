@@ -13,7 +13,7 @@
     "dist": "npm run prepare-app && electron-builder"
   },
   "devDependencies": {
-    "electron": "33.2.1",
+    "electron": "44.7.0",
     "electron-builder": "25.1.8",
     "@electron/fuses": "1.8.0"
   },
