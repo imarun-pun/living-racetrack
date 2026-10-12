@@ -47,11 +47,16 @@ if (CAP) {
   if ([6, 12, 20].includes(+CAP.get('laps'))) S.laps = +CAP.get('laps');
   if (CAP.get('garage') === '0') S.garage = false;
 }
-const save = () => { if (CAP) return; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
-const teams = () => SYNC ? SYNC.T : PW.resolveTeams(S);
-const drivers = () => SYNC ? SYNC.D : PW.resolveDrivers(S);
+const save = () => { if (CAP || /[?&]stream\b/.test(location.search)) return; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const teams = () => STORY ? STORY.teams : SYNC ? SYNC.T : PW.resolveTeams(S);
+const drivers = () => STORY ? STORY.drivers : SYNC ? SYNC.D : viewers.size ? seatViewers(PW.resolveDrivers(S)) : PW.resolveDrivers(S);
+/* Stream mode: viewers from chat who have taken a car. key -> { name, slot, last, platform } */
+const viewers = new Map();
+const seatViewers = D => { for (const v of viewers.values()) if (v.slot >= 0 && v.slot < D.length) D[v.slot] = { ...D[v.slot], name: v.name, flag: '', code: PW.driverCode(v.name) }; return D; };
 /* A synced race (World Race or a Race Room) when not null: { spec, T, D } */
 let SYNC = null;
+/* A story-mode race when not null (see story.js) */
+let STORY = null;
 const allTracks = () => [...PW.ORIGINAL_CIRCUITS, ...(PW.REAL_CIRCUITS || []), ...S.custom];
 function playlist() {
   const all = allTracks();
@@ -97,13 +102,16 @@ const pairT = {};
 let msgs = [], bannerT = 0, firstStart = true, pendT = 0, garageInfo = null, radioT = 0;
 
 function newRace(def, spec) {
-  if (spec) { def = spec.track; const sd = PW.syncDrivers(spec); SYNC = { spec, T: sd.teams, D: sd.drivers, key: spec.kind === 'world' ? 'w' + spec.n : 'r' + spec.seed.toString(36) }; }
+  STORY = spec && spec.kind === 'story' ? spec : null;
+  if (STORY) { def = spec.track; SYNC = null; spec = null; }
+  else if (spec) { def = spec.track; const sd = PW.syncDrivers(spec); SYNC = { spec, T: sd.teams, D: sd.drivers, key: spec.kind === 'world' ? 'w' + spec.n : 'r' + spec.seed.toString(36) }; }
   else SYNC = null;
   C = PW.buildCircuit(def); renderer.setCircuit(C);
   TS = C.T / (spec ? spec.lapSeconds : S.lapSeconds);
   if (!spec && S.format === 'elimination' && !S.cup) S.cup = { alive: drivers().map((d, i) => i), round: 1, champs: [] };
   const K = spec ? { on: false } : S.career;
-  race = spec ? new PW.Race(C, { laps: spec.laps, incidents: true, weather: 'auto', teams: teams(), drivers: drivers(), format: 'standard', seed: spec.seed, auto: true, timeScale: TS })
+  race = STORY ? new PW.Race(C, { laps: STORY.laps, incidents: true, weather: STORY.weather, teams: teams(), drivers: drivers(), format: 'standard', teamOrder: STORY.teamOrder, bonus: STORY.bonus, traits: STORY.traits })
+    : spec ? new PW.Race(C, { laps: spec.laps, incidents: true, weather: 'auto', teams: teams(), drivers: drivers(), format: 'standard', seed: spec.seed, auto: true, timeScale: TS })
     : new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams(), drivers: drivers(), format: S.format,
     entrants: S.format === 'elimination' ? S.cup.alive : null,
     teamOrder: K.on ? K.order : null, bonus: K.on ? { [K.slot]: (K.up.engine + K.up.aero + K.up.tyres) * .0013 } : null });
@@ -115,22 +123,28 @@ function newRace(def, spec) {
   const kind = wk && def.id === wk.track ? 'Real race weekend · ' + PW.weekendLabel(wk) : def.kind === 'real' ? 'Real-layout replica' : def.kind === 'custom' ? 'Imported track' : 'Original circuit';
   const fmt = spec ? '' : S.format === 'elimination' ? ` · Elimination Cup ${S.cup.alive.length <= 4 ? 'final' : 'round ' + S.cup.round} · ${S.cup.alive.length} drivers` : S.format === 'reverse' ? ' · Reverse grid' : '';
   const car = K.on ? ` · Career S${K.season} race ${K.race + 1}/${K.per}` : '';
-  $('round').textContent = round; $('kind').textContent = spec ? (spec.kind === 'world' ? 'World Race · live on every Lapwall' : 'Race Room · ' + spec.title) + ' · Simulated race' : kind + fmt + car + ' · Simulated race';
+  $('round').textContent = round; $('kind').textContent = STORY ? 'Story mode · Road to the Grid' : spec ? (spec.kind === 'world' ? 'World Race · live on every Lapwall' : 'Race Room · ' + spec.title) + ' · Simulated race' : kind + fmt + car + ' · Simulated race';
   $('cname').textContent = def.name; $('aname').textContent = def.name; $('aplace').textContent = def.place || kind;
   $('alen').textContent = (C.L / 1000).toFixed(3) + ' km'; $('acorn').textContent = C.corners.length; $('alaps').textContent = race.laps;
   nextDef = spec ? def : pickNext(def);
-  telemetry.reset(race); renderLobby(true); $('bnext').disabled = !!spec;
+  telemetry.reset(race); renderLobby(true); raceId++; streamPicks.clear(); $('bnext').disabled = !!spec;
   msgs = []; renderTicker(); buildRows(); layout(); drawLocator(); artCaption();
   art.view = 'map'; art.shot = 0; art.t = 0; art.cut = null;
   const nx = PW.weekendNext && PW.weekendNext();
   $('anext-wrap').hidden = !nx && !wk;
   $('anext').textContent = wk ? 'This weekend · ' + wk.place : nx ? `${nx.place} · in ${nx.days} day${nx.days === 1 ? '' : 's'}` : '';
   if (race.weather.kind === 'wet') say('Wet race · everyone starts on intermediates', 'wx');
+  if (STORY) say(`Mission: ${STORY.mission.t}`, 'fl', true, 'STORY');
 }
 
 // ---------- Events → ticker, banners, cameras ----------
 function onEvent(type, d) {
   const c = d.car, fav = !!c && c.team === S.favTeam;
+  if (streamListeners.length && ['done', 'command', 'chequered', 'crash', 'spin', 'fastest', 'lights-out'].includes(type)) {
+    const msg = { type, id: raceId, car: c ? { code: c.code, name: c.name, slot: c.i, viewer: viewerAt(c.i) } : null, cmd: d.cmd };
+    if (type === 'done') msg.finish = race.finishOrder.map((f, p) => ({ pos: p + 1, slot: f.i, name: f.name, viewer: viewerAt(f.i) })), msg.picks = [...streamPicks];
+    streamListeners.forEach(fn => { try { fn(msg); } catch (e) { /* listener error */ } });
+  }
   switch (type) {
     case 'pit':
       say(`${c.code} pits · ${PW.TYRES[d.tyre].n} · ${d.dur.toFixed(1)}s${d.slow ? ' · slow stop' : ''}`, d.slow ? 'sc' : '', fav);
@@ -154,6 +168,11 @@ function onEvent(type, d) {
     case 'drying': say('The track is drying · slicks are coming back', 'wx'); break;
     case 'chequered': say(`Chequered flag · ${c.code} wins at ${C.def.name}`, 'red', fav); break;
     case 'done': showPodium(); break;
+    case 'command': {
+      const words = { push: 'pushes hard', save: 'saves the tyres', normal: 'back to normal pace', box: 'box this lap', boost: 'overtake boost!' };
+      if (c === myCar() || STREAMING) say(`${c.code} · ${words[d.cmd]}`, d.cmd === 'boost' ? 'fl' : 'radio', fav, 'CALL');
+      break;
+    }
     case 'recovery': say(`Recovery crane lifts ${c.code}'s car over the wall`, 'sc', fav); break;
     case 'cleared': say(`Track clear · ${c.code}'s car is taken away`, 'sc'); break;
     case 'radio': {
@@ -285,7 +304,7 @@ function showPodium() {
   phase = 'podium'; phaseT = 0; pitcam.clear(); hideBanner();
   const [p1, p2, p3] = race.finishOrder, T = teams();
   if (!p1) { phaseT = 12; return; }
-  if (SYNC) judgePick(); else awardPoints();
+  if (SYNC) judgePick(); else if (!STORY) awardPoints();
   $('pcode').textContent = p1.code;
   $('pteam').innerHTML = `<span class="name">${flagImg(p1.flag)}${PW.esc(p1.name)}</span>${PW.esc(T[p1.team].name)} · #${p1.num} · Winner`;
   $('pbar').style.background = p1.color; $('ptitle').textContent = `Chequered flag · ${C.def.name}`;
@@ -374,7 +393,7 @@ function applyLight(d) { const l = lightAt(d || new Date()); onboard.light = l; 
 // ---------- Layout ----------
 function drawLocator() {
   const d = C && C.def, el = $('locator');
-  el.hidden = !(d && typeof d.lat === 'number') || S.locator === 'off' || curView() !== 'map' || S.mode === 'art' || telemOn();
+  el.hidden = !(d && typeof d.lat === 'number') || S.locator === 'off' || curView() !== 'map' || S.mode === 'art' || telemOn() || STREAMING;
   if (el.hidden) return;
   PW.drawLocator(el.querySelector('canvas'), d.lat, d.lon, d.hue || '#38c6ff');
   $('loccap').textContent = PW.fmtCoord(d.lat, d.lon);
@@ -391,7 +410,7 @@ function layout() {
   if (S.mode === 'art') r = { x: W * .04, y: H * .06, w: W * .92, h: H * .88 };
   else if (S.mode === 'ambient') r = narrow ? { x: 16, y: H * .16, w: W - 32, h: H * .5 } : { x: W * .05, y: H * .1, w: W * .9, h: H * .62 };
   else if (narrow) r = { x: 16, y: 150, w: W - 32, h: Math.max(140, H - 150 - (5 * row + 120)) };
-  else r = { x: 290, y: 104, w: W - 290 - 36 - (telemOn() ? 340 : 0), h: H - 104 - 120 };
+  else r = { x: 290, y: 104, w: W - 290 - 36 - (telemOn() ? 340 : 0) - (STREAMING ? 380 : 0), h: H - 104 - 120 };
   renderer.layout(W, H, DPR, r, { style: S.mapStyle, zoom: S.mapZoom, hires: curView() === 'chase' || S.mode === 'art' });
   applyLight();
 }
@@ -429,7 +448,8 @@ function frame(now) {
       phaseT += dtR; $('pnext').textContent = `${$('pnext').dataset.season ? $('pnext').dataset.season + ' · ' : ''}` + (SYNC ? (SYNC.spec.kind === 'world' ? 'Next World Race at ' + new Date(SYNC.spec.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Race over') : `Next: ${nextDef.name} in ${Math.max(0, Math.ceil(12 - phaseT))}s`);
       if (phaseT > 12) {
         $('podium').hidden = true; celebration.stop();
-        if (S.garage && garageInfo) { phase = 'garage'; phaseT = 0; garage.show(garageInfo); } else afterRace();
+        if (STORY) { phase = 'story'; PW.Story.raceDone(race); }
+        else if (S.garage && garageInfo) { phase = 'garage'; phaseT = 0; garage.show(garageInfo); } else afterRace();
       }
     } else if (phase === 'garage') {
       phaseT += dtR; garage.update(dtR, 20 - phaseT, nextDef.name);
@@ -455,7 +475,7 @@ function frame(now) {
   if (!driveBy.active && phase !== 'garage' && !paused) checkReminders(now);
   if (S.driveby && S.mode === 'ambient' && phase === 'race' && !driveBy.active && now > nextDrive) startDriveBy();
   if (driveBy.active) driveBy.update(paused ? 0 : dtR);
-  if (now - hudT > 200) { renderHUD(); hudT = now; }
+  if (now - hudT > 200) { renderHUD(); renderDrive(); hudT = now; }
   if (now - clockT > 1000) {
     renderClock(); clockT = now;
     const before = msgs.length; msgs = msgs.filter(m => now - m.at < 16000); if (msgs.length !== before) renderTicker();
@@ -463,6 +483,75 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 let lightsOff = 0;
+
+// ---------- Pit wall: strategy calls for your car ----------
+const DRIVE_KEYS = { 1: 'push', 2: 'normal', 3: 'save', b: 'box', o: 'boost' };
+const STREAMING = /[?&]stream\b/.test(location.search);
+/* Your car: your story driver, your career driver, otherwise the car the cameras follow. */
+function myCar() {
+  if (!race) return null;
+  const slot = PW.Story && PW.Story.active() ? PW.Story.slot() : S.career.on ? S.career.slot : -1;
+  return slot >= 0 ? race.cars.find(c => c.i === slot) || null : camCar();
+}
+function drive(cmd) { if (SYNC) return; const c = myCar(); if (c) race.command(c, cmd); renderDrive(); }
+function renderDrive() {
+  const show = S.mode === 'race' && !SYNC && !LOCK && !STREAMING && (S.telemetry || S.career.on || (PW.Story && PW.Story.active()));
+  const el = $('drive'); el.hidden = !show; if (!show) return;
+  const c = myCar(); if (!c) return;
+  $('dv-who').textContent = `#${c.num} ${PW.shortName(c.name).toUpperCase()}`;
+  el.querySelectorAll('button[data-cmd]').forEach(b => {
+    const k = b.dataset.cmd, lap = Math.floor(c.dist / C.L);
+    b.setAttribute('aria-pressed', String(k === c.mode || (k === 'box' && (c.pitNext || c.inPit)) || (k === 'boost' && c.boostT > 0)));
+    if (k === 'boost') b.disabled = c.boostLap === lap || race.state !== 'racing';
+  });
+}
+$('drive').addEventListener('click', e => { const b = e.target.closest('button[data-cmd]'); if (b) drive(b.dataset.cmd); });
+
+// ---------- Stream mode (?stream): Stream Studio drives this through window.__lapwallStream ----------
+let raceId = 0;
+const streamPicks = new Map(), streamListeners = [];
+const picksOpen = () => race.startT === undefined || (race.state === 'racing' && !race.redUsed && race.leaderLap() <= 1);
+const viewerAt = slot => { for (const [k, v] of viewers) if (v.slot === slot) return k; return null; };
+const cleanName = s => String(s || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20);
+if (STREAMING) {
+  document.body.classList.add('streaming');
+  window.__lapwallStream = {
+    join(key, name, platform) {
+      name = cleanName(name); if (!name || SYNC) return null;
+      const now = Date.now(); let v = viewers.get(key);
+      if (v) { v.last = now; return { slot: v.slot, again: true }; }
+      const used = new Set([...viewers.values()].map(x => x.slot));
+      let slot = -1; for (let i = 0; i < 20; i++) if (!used.has(i)) { slot = i; break; }
+      if (slot < 0) {   // full: the seat of whoever has been quiet longest, if they have been quiet for 10 minutes
+        let old = null; for (const [k, x] of viewers) if (!old || x.last < old[1].last) old = [k, x];
+        if (!old || now - old[1].last < 600000) return { full: true };
+        viewers.delete(old[0]); slot = old[1].slot;
+      }
+      viewers.set(key, { name, slot, last: now, platform }); applyDrivers();
+      const c = race.cars.find(x => x.i === slot);
+      return { slot, num: c ? c.num : drivers()[slot].num };
+    },
+    leave(key) { if (viewers.delete(key)) applyDrivers(); },
+    act(key, cmd) {
+      const v = viewers.get(key); if (!v || SYNC) return null; v.last = Date.now();
+      const c = race.cars.find(x => x.i === v.slot); return c ? race.command(c, cmd) : null;
+    },
+    pick(key, arg) {
+      if (SYNC || !picksOpen()) return null;
+      const a = String(arg || '').trim().toLowerCase().replace(/^#/, ''); if (!a) return null;
+      const c = race.cars.find(x => x.code.toLowerCase() === a || String(x.num) === a) || race.cars.find(x => x.name.toLowerCase().includes(a));
+      if (!c) return null; streamPicks.set(key, c.i); return { code: c.code, name: c.name };
+    },
+    state() {
+      const lead = race.running()[0];
+      return { id: raceId, track: C.def.name, state: race.state, lap: race.startT === undefined ? 0 : race.leaderLap(), laps: race.laps, picksOpen: picksOpen(),
+        seats: [...viewers].map(([k, v]) => { const c = race.cars.find(x => x.i === v.slot); return { key: k, name: v.name, platform: v.platform, slot: v.slot, num: c ? c.num : 0, pos: c ? race.order.indexOf(c) + 1 : 0, color: c ? c.color : '#888', mode: c ? c.mode : '' }; }),
+        leader: lead ? lead.code : '' };
+    },
+    on(fn) { streamListeners.push(fn); },
+    config(o) { if (o && [6, 12, 20].includes(+o.laps)) { S.laps = +o.laps; } }
+  };
+}
 
 // ---------- World Race and Race Rooms (synced, no server) ----------
 let syncMe = -1, roomOver = false, lobbyT = 0;
@@ -531,6 +620,15 @@ $('lb-rematch').addEventListener('click', () => {
   const sp = SYNC.spec, r = PW.cleanRoom({ n: sp.n, h: sp.h, t: sp.t, l: sp.l, g: sp.g, d: (Math.random() * 4294967296) >>> 0, s: Math.ceil((Date.now() + 3 * 60000) / 60000) * 60000 });
   history.replaceState(null, '', '#room=' + PW.encodeRoom(r)); enterSync(r);
 });
+PW.Story.attach({
+  startRace(spec) { round++; S.mode = 'race'; setMode('race'); newRace(null, spec); },
+  allowTelemetry() { setTelemetry(true); },
+  exitStory() { if (STORY || phase === 'story') { STORY = null; round++; newRace(pickNext(null)); } }
+});
+$('bstory').addEventListener('click', () => { playMenu(false); PW.Story.open(); });
+const playMenu = open => { $('playmenu').hidden = !open; $('bplay').setAttribute('aria-expanded', String(open)); };
+$('bplay').addEventListener('click', e => { e.stopPropagation(); playMenu($('playmenu').hidden); });
+addEventListener('click', e => { if (!e.target.closest('.menu')) playMenu(false); });
 $('bworld').addEventListener('click', () => { if (SYNC && SYNC.spec.kind === 'world') leaveSync(); else { S.world = true; save(); $('bworld').setAttribute('aria-pressed', 'true'); enterSync(PW.worldSlot()); } });
 addEventListener('hashchange', () => { const r = PW.decodeRoom(location.hash); if (r) enterSync(r); });
 
@@ -634,6 +732,7 @@ addEventListener('keydown', e => {
   else if (k === 'v') { const v = Object.keys(VIEWS); setView(v[(v.indexOf(S.view) + 1) % v.length]); }
   else if (k === 'w' && !driveBy.active) startDriveBy(PW.REMINDERS.water);
   else if (k === 't') setTelemetry(!S.telemetry);
+  else if (DRIVE_KEYS[k]) drive(DRIVE_KEYS[k]);
   else if (k === 'escape') openSettings(false);
 });
 let idleT;
@@ -790,7 +889,7 @@ $('s-clear').addEventListener('click', () => {
 $('s-reset').addEventListener('click', () => { S = { ...structuredClone(PW.DEFAULT_SETTINGS), mode: S.mode }; save(); syncForm(); applyTeams(); round++; newRace(pickNext(null)); });
 
 // Send-a-Zoom-by opens next to this page on the web, or on the public site otherwise
-if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test(location.hostname)) { $('bsend').href = PW.HOME + 'send.html'; $('broom').href = PW.HOME + 'room.html'; }
+if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test(location.hostname)) { $('bsend').href = PW.HOME + 'send.html'; $('broom').href = PW.HOME + 'room.html'; $('bstream').href = PW.HOME + 'stream.html'; }
 
 // ---------- Wall display lock ----------
 function setupLock() {

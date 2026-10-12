@@ -86,7 +86,7 @@ PW.Telemetry = class Telemetry {
     g.strokeStyle = ty.c; g.lineWidth = 3; g.beginPath(); g.arc(W - P - 14, y + 15, 11, 0, TAU); g.stroke();
     g.font = `700 11px ${mono}`; g.fillStyle = ty.c; g.textAlign = 'center'; g.fillText(car.tyre, W - P - 14, y + 19);
     label(`${car.tyreLaps} LAP${car.tyreLaps === 1 ? "" : "S"}`, W - P - 30, y + 19, '#8a94a8', 'right');
-    const wear = Math.max(0, Math.min(1, 1 - car.tyreLaps * ty.deg * 22)); label(`TYRE ${Math.round(wear * 100)}%`, W - P - 30, y + 33, wear < .35 ? '#ff5a5a' : '#8a94a8', 'right');
+    const wear = Math.max(0, Math.min(1, 1 - (car.wear ?? car.tyreLaps) * ty.deg * 22)); label(`TYRE ${Math.round(wear * 100)}%`, W - P - 30, y + 33, wear < .35 ? '#ff5a5a' : '#8a94a8', 'right');
     y += 50;
     // speed, gear, revs
     const gear = car.inPit ? 0 : Math.max(1, Math.min(8, GEARS.findIndex(v => car.v < v))), lo = GEARS[Math.max(0, gear - 1)], hi = GEARS[gear] === 999 ? 92 : GEARS[gear] || 20;

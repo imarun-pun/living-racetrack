@@ -72,6 +72,14 @@
     </div>
   </section>
   <div class="syncpill" id="syncpill" hidden></div>
+  <div class="drive" id="drive" hidden role="group" aria-label="Strategy calls for your car">
+    <span class="dv-who" id="dv-who"></span>
+    <button type="button" data-cmd="push" title="Push (1)">Push <kbd>1</kbd></button>
+    <button type="button" data-cmd="normal" title="Normal pace (2)">Normal <kbd>2</kbd></button>
+    <button type="button" data-cmd="save" title="Save tyres (3)">Save tyres <kbd>3</kbd></button>
+    <button type="button" data-cmd="box" title="Box this lap (B)">Box <kbd>B</kbd></button>
+    <button type="button" data-cmd="boost" title="Overtake boost, once a lap (O)">Boost <kbd>O</kbd></button>
+  </div>
   <section class="lobby" id="lobby" hidden aria-live="polite">
     <div class="eyebrow" id="lb-kind">World Race</div>
     <h2 id="lb-title">Circuit</h2>
@@ -83,6 +91,7 @@
     <p class="hint" id="lb-score"></p>
   </section>
   <section class="telem" id="telem" hidden aria-label="Live telemetry"><canvas id="telemetry"></canvas></section>
+  <section class="story" id="story" hidden aria-label="Story mode"></section>
   <div class="artfx" aria-hidden="true"></div>
   <div class="artcap" id="artcap" aria-live="polite"><b></b><span></span></div>
   <div class="wm" id="wm" hidden></div>
@@ -98,9 +107,16 @@
     <button id="bmode" type="button">Mode: Race view</button>
     <button id="bnext" type="button">Next race</button>
     <button id="btelem" type="button" aria-pressed="false">Telemetry</button>
-    <button id="bworld" type="button" aria-pressed="false">World Race</button>
-    <a class="btn" id="broom" href="room.html" target="_blank" rel="noopener">Race Room</a>
-    <a class="btn" id="bsend" href="send.html" target="_blank" rel="noopener">Send a Zoom-by</a>
+    <div class="menu">
+      <button id="bplay" type="button" aria-expanded="false" aria-controls="playmenu">Play ▴</button>
+      <div class="menu-pop" id="playmenu" hidden>
+        <button id="bstory" type="button">Story mode · Road to the Grid</button>
+        <button id="bworld" type="button" aria-pressed="false">World Race · same race everywhere</button>
+        <a class="btn" id="broom" href="room.html" target="_blank" rel="noopener">Race Room · invite friends ↗</a>
+        <a class="btn" id="bsend" href="send.html" target="_blank" rel="noopener">Send a Zoom-by ↗</a>
+        <a class="btn" id="bstream" href="stream.html" target="_blank" rel="noopener">Stream Studio · Kick, YouTube, Twitch ↗</a>
+      </div>
+    </div>
     <button id="bset" type="button">Customize</button>
     <button id="bfull" type="button">Full screen</button>
   </nav>
@@ -208,6 +224,7 @@
 <script src="js/onboard.js"></script>
 <script src="js/telemetry.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/story.js"></script>
 <script src="js/driveby.js"></script>
 <script src="js/main.js"></script>
 </body>

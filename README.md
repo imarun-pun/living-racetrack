@@ -14,6 +14,9 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 
 | | |
 |---|---|
+| **Story mode** | *Road to the Grid*: start in a rented kart and climb Kart Cup, Junior, Rising and Feeder series to the Grand Prix World Series. Train your skills, hire a crew (engineer, mechanic, strategist, data analyst), sign sponsors, take on race missions, and make choices with your mentor Ines, your rival Kai Brandt, team bosses and the press. Every race is a real race you strategise from the pit wall. |
+| **Stream on Kick, YouTube, Twitch** | The Stream Studio reads your chat: viewers type `!join` to get a car with their name, `!push`, `!save`, `!box`, `!boost` to run its strategy, and `!pick` to call the winner. A chat championship stays on screen. See [docs/STREAMING.md](docs/STREAMING.md). |
+| **Pit wall** | In your own races, call the strategy for your car: Push (1), Normal (2), Save tyres (3), Box (B), Overtake boost (O). |
 | **World Race** | Every Lapwall on Earth watches the same race at the same moment. A new race starts every 6 minutes on the world clock; the circuit and the whole race come from the time slot, so no server is involved and nothing is sent anywhere. Pick a winner before the lights go out and build your pundit score. |
 | **Race Rooms** | Put your friends' names on the grid, pick a circuit and a start time, and send the link or QR code (plus a calendar invite). Everyone who opens it sees the same race live, on any device; late arrivals jump straight to the live moment. Rematch in one tap. |
 | **Live telemetry** | Press `T`: speed, gear, revs, throttle, brake, DRS and battery for the car you follow, a speed trace against their best lap and the car ahead, purple/green/yellow mini-sectors, a battle forecast ("DRS range in 2 laps"), live win chances, and track dominance coloured onto the map. |
@@ -118,6 +121,8 @@ js/carside.js           side-view race car (Zoom-bys, garage)
 js/capture.js           frame-exact clock for recording TV videos (?capture)
 js/telemetry.js         live telemetry panel and track dominance
 js/sync.js, room.html   World Race and Race Rooms: seeded races synced by the clock, invite links
+js/story.js             Story mode: Road to the Grid
+stream.html, js/stream.js   Stream Studio: chat commands from Kick, YouTube and Twitch
 tools/                  local server, single-file build, track converter, TV video recorder,
                         licence signing (license.mjs) and USB kit builder (usb-kit.mjs)
 install/                Raspberry Pi kiosk installer

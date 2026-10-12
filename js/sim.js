@@ -36,7 +36,8 @@ PW.Race = class Race {
       const code = d.code, team = Math.floor(i / 2), start = this.weather.rain > .4 ? 'I' : (this.rand() < .5 ? 'S' : 'M');
       const pace = teamPace[team] + this.rnd(-.0015, .0015) + (opt.bonus && opt.bonus[i] || 0);
       return { i, code, name: d.name, flag: d.flag, num: d.num, team, color: teams[team].color, color2: teams[team].color2, pace, quali: pace + this.rnd(-.004, .004),
-        dist: 0, v: 0, lat: 0, latT: 0, gridLat: 0, yaw: 0, tyre: start, tyreLaps: 0,
+        dist: 0, v: 0, lat: 0, latT: 0, gridLat: 0, yaw: 0, tyre: start, tyreLaps: 0, wear: 0, mode: 'normal', boostT: 0, boostLap: -1,
+        trait: opt.traits && opt.traits[i] || null,   // story driver skills (0..1): wet, tyres, fitness, racecraft; pit = mechanic level
         pitLap: Math.max(2, Math.round(this.laps * (start === 'S' ? this.rnd(.33, .48) : this.rnd(.48, .64)))), planDone: false,
         pitNext: false, inPit: false, stopped: false, stopT: 0, stopDur: 0,
         noise: 0, cp: -1, cpT: 0, lapStart: 0, best: Infinity, finished: false, out: false,
@@ -47,6 +48,16 @@ PW.Race = class Race {
     this.order = [...this.cars].sort((a, b) => a.lastPos - b.lastPos);
   }
   rnd(a, b) { return a + this.rand() * (b - a); }
+  /* A call from the pit wall for one car: 'push' | 'normal' | 'save' | 'box' | 'boost'. Not in synced races. */
+  command(c, cmd) {
+    if (this.auto || !c || c.out || c.finished || c.crash) return null;
+    if (cmd === 'push' || cmd === 'save' || cmd === 'normal') { if (c.mode === cmd) return null; c.mode = cmd; this.emit('command', { car: c, cmd }); return cmd; }
+    if (this.state !== 'racing') return null;
+    const lap = Math.floor(c.dist / this.C.L);
+    if (cmd === 'box') { if (c.inPit || c.pitNext || this.laps - lap <= 1) return null; c.pitNext = true; c.radioPit = true; this.emit('command', { car: c, cmd }); return cmd; }
+    if (cmd === 'boost') { if (c.boostLap === lap || c.inPit || this.sc) return null; c.boostLap = lap; c.boostT = 14; this.emit('command', { car: c, cmd }); return cmd; }
+    return null;
+  }
   shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
   on(fn) { this.listeners.push(fn); }
   emit(type, d) { for (const f of this.listeners) f(type, d || {}); }
@@ -55,7 +66,7 @@ PW.Race = class Race {
 
   grid(list, base) {
     list.forEach((c, g) => {
-      c.dist = base - 10 - g * 8; c.v = 0; c.gridLat = c.lat = c.latT = (g % 2 ? 1.1 : -1.1); c.lastPos = g;
+      c.dist = base - 10 - g * 8; c.v = 0; c.gridLat = c.lat = c.latT = (g % 2 ? 1.1 : -1.1); c.lastPos = g; if (c.gridPos === undefined) c.gridPos = g;
       c.react = this.rnd(.15, .45); c.passT = null; c.spin = null; c.yaw = 0;
     });
     this.gridBase = base;
@@ -70,7 +81,7 @@ PW.Race = class Race {
     this.grid(run, base);
     const remain = this.laps - Math.floor(base / L);
     for (const c of run) {
-      c.tyre = this.weather.rain > .4 ? 'I' : remain > this.laps * .5 ? 'H' : 'M'; c.tyreLaps = 0; c.planDone = true; c.pitNext = false;
+      c.tyre = this.weather.rain > .4 ? 'I' : remain > this.laps * .5 ? 'H' : 'M'; c.tyreLaps = 0; c.wear = 0; c.planDone = true; c.pitNext = false;
       c.inPit = false; c.stopped = false; c.puncture = false; c.radioPit = false; c.lapStart = null; c.cp = Math.floor(c.dist / (L / CP)); c.cpT = this.t;
     }
     this.leaderCp.length = Math.max(0, Math.floor(base / (L / CP)) - 30);
@@ -110,8 +121,11 @@ PW.Race = class Race {
       const s = mod(c.dist, L), i = Math.min(PW.N - 1, Math.floor(s / C.ds)), lapIdx = Math.floor(c.dist / L);
       const ty = PW.TYRES[c.tyre];
       c.noise += (this.rand() - .5) * .004 * dt - c.noise * .4 * dt; c.noise = Math.max(-.004, Math.min(.004, c.noise));
-      const wet = c.tyre === 'I' ? .905 + .02 * W.rain : 1 - .22 * W.rain;
-      let target = C.V[i] * c.pace * (ty.base - ty.deg * c.tyreLaps) * wet * (1 + c.noise) * (c.puncture ? .72 : 1);
+      const wet = c.tyre === 'I' ? .905 + .02 * W.rain : 1 - .22 * W.rain * (c.trait ? 1.25 - .5 * c.trait.wet : 1);
+      let target = C.V[i] * c.pace * (ty.base - ty.deg * c.wear) * wet * (1 + c.noise) * (c.puncture ? .72 : 1);
+      // strategy calls from the pit wall (you, or a viewer in chat): push, save tyres, overtake boost
+      target *= c.mode === 'push' ? 1.006 : c.mode === 'save' ? .994 : 1;
+      if (c.boostT > 0) { c.boostT -= dt; target *= 1.025; }
       if (c.finished) target = Math.min(target, C.V[i] * .55);
       if (this.sc) {
         target = Math.min(target, C.V[i] * .85);
@@ -126,7 +140,7 @@ PW.Race = class Race {
       // incidents
       if (this.state === 'racing' && this.opt.incidents && !this.sc && !c.inPit && !c.spin && !c.crash && !c.finished && c.v > 28 && Math.abs(C.K[i]) > 1 / 160 && this.t - this.startT > 20) {
         const slick = c.tyre !== 'I';
-        const rate = .0004 * (1 + 2 * W.rain) * (slick ? 1 + 5 * W.rain : 1) * (c.puncture ? 3 : 1);
+        const rate = .0004 * (1 + 2 * W.rain) * (slick ? 1 + 5 * W.rain : 1) * (c.puncture ? 3 : 1) * (c.mode === 'push' ? 1.8 : c.mode === 'save' ? .6 : 1) * (c.trait ? 1.4 - .8 * c.trait.fitness : 1);
         if (this.rand() < rate * dt) this.rand() < .3 ? this.startCrash(c, i) : this.startSpin(c, i);
       }
       if (c.spin) {
@@ -160,15 +174,15 @@ PW.Race = class Race {
         target = Math.min(target, 22);
         if (!c.stopped && lapIdx >= c.pitLapIdx && s > c.boxS && s < L * .5) {
           if (c.stopT === 0) {
-            const slow = this.rand() < .05;
-            c.stopDur = slow ? this.rnd(5.5, 9) : this.rnd(2.1, 2.9);
+            const slow = this.rand() < .05 * (c.trait ? 1 - .25 * (c.trait.pit || 0) : 1);
+            c.stopDur = (slow ? this.rnd(5.5, 9) : this.rnd(2.1, 2.9)) * (c.trait ? 1 - .06 * (c.trait.pit || 0) : 1);
             const remain = this.laps - lapIdx;
             const nt = W.rain > .4 ? 'I' : c.puncture ? (remain > this.laps * .5 ? 'H' : 'M') : remain > this.laps * .5 ? 'H' : remain > 4 ? 'M' : 'S';
             c.newTyre = nt; c.slowStop = slow;
             this.emit('pit', { car: c, dur: c.stopDur, tyre: nt, slow });
           }
           c.stopT += dt; target = 0; c.v = 0;
-          if (c.stopT >= c.stopDur) { c.stopped = true; c.tyre = c.newTyre; c.tyreLaps = 0; c.puncture = false; }
+          if (c.stopT >= c.stopDur) { c.stops = (c.stops || 0) + 1; c.stopped = true; c.tyre = c.newTyre; c.tyreLaps = 0; c.wear = 0; c.puncture = false; }
         }
         if (c.stopped && s > L * .065 && s < L * .5) { c.inPit = false; c.stopped = false; c.stopT = 0; c.pitNext = false; c.planDone = true; c.pitOut = this.t; c.radioPit = false; }
       }
@@ -180,7 +194,7 @@ PW.Race = class Race {
         if (o.inPit !== c.inPit) continue;
         gap = mod(o.dist - c.dist, L); ahead = o; break;
       }
-      if (c.passT && (c.passT.dist < c.dist - 7 || mod(c.passT.dist - c.dist, L) > 20 || c.passT.out)) { c.passT = null; c.passCd = 2.5; }
+      if (c.passT && (c.passT.dist < c.dist - 7 || mod(c.passT.dist - c.dist, L) > 20 || c.passT.out)) { c.passT = null; c.passCd = 2.5 * (c.trait ? 1.3 - .8 * c.trait.racecraft : 1); }
       c.passCd -= dt;
       c.drs = !!(ahead && this.state === 'racing' && !this.sc && !this.yellow && !c.inPit && lapIdx >= 2 && W.rain < .3 &&
         this.inDRS(s) && gap / Math.max(c.v, 1) < 1 && !ahead.inPit);
@@ -324,7 +338,7 @@ PW.Race = class Race {
   lapDone(c, lapN) {
     const valid = c.lapStart !== null;
     const lt = c.cpT - c.lapStart; c.lapStart = c.cpT;
-    c.tyreLaps++;
+    c.tyreLaps++; c.wear += (c.mode === 'push' ? 1.5 : c.mode === 'save' ? .65 : 1) * (c.trait ? 1.25 - .5 * c.trait.tyres : 1);
     if (valid && lapN >= 2 && lt < c.best) c.best = lt;
     if (valid && lapN >= 2 && lt < this.fl.t && !c.finished && this.state === 'racing') {
       const had = this.fl.car; this.fl = { t: lt, car: c };

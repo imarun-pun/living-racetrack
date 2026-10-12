@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lapwall Stream Studio</title>
+<meta name="description" content="Stream Lapwall on Kick, YouTube or Twitch. Viewers type !join in chat to get a car and call their own strategy.">
+<meta name="theme-color" content="#07090d">
+<!-- Only this page talks to the internet, and only to read chat: YouTube's API, Kick's chat socket, Twitch's chat socket. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'self'; connect-src 'self' https://www.googleapis.com wss://ws-us2.pusher.com wss://irc-ws.chat.twitch.tv; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/stream.css">
+</head>
+<body>
+<iframe id="app" src="index.html?stream" title="Lapwall race"></iframe>
+
+<aside class="side">
+  <section class="panel join">
+    <div class="eyebrow"><span class="live">● LIVE</span> Race with the stream</div>
+    <h2>Type <b>!join</b> in chat</h2>
+    <p class="cmds"><code>!push</code> <code>!save</code> <code>!box</code> <code>!boost</code> drive your car · <code>!pick VER</code> call the winner</p>
+    <div class="seats"><span id="seatCount">0</span>/20 cars taken by chat</div>
+    <ol class="seatlist" id="seatList"></ol>
+  </section>
+  <section class="panel champ">
+    <div class="eyebrow">Chat championship · <span id="raceCount">0</span> races</div>
+    <ol class="champlist" id="champList"><li class="empty">Finish a race in a chat car to score</li></ol>
+  </section>
+</aside>
+<div class="moment" id="moment" hidden></div>
+<ul class="feed" id="feed" aria-live="polite"></ul>
+<div class="status" id="status"></div>
+
+<button class="gear" id="gear" type="button" aria-label="Stream settings">Settings</button>
+<aside class="setup" id="setup" hidden aria-label="Stream settings">
+  <header><h2>Stream Studio</h2><button type="button" id="close">Close</button></header>
+  <p class="hint">Add this page to OBS (or Streamlabs) as a <b>Browser Source</b>, 1920 × 1080. Viewers type commands in your chat; this page reads chat directly from each platform. Nothing is stored anywhere except this browser.</p>
+  <fieldset>
+    <legend>Kick</legend>
+    <label>Chatroom ID <input type="text" id="kickRoom" inputmode="numeric" placeholder="e.g. 1234567"></label>
+    <p class="hint">Find it by opening <code>kick.com/api/v2/channels/YOURNAME</code> in a browser and looking for <code>"chatroom":{"id":…</code>.</p>
+  </fieldset>
+  <fieldset>
+    <legend>YouTube</legend>
+    <label>Live video ID <input type="text" id="ytVideo" placeholder="the part after watch?v="></label>
+    <label>API key <input type="password" id="ytKey" placeholder="YouTube Data API v3 key" autocomplete="off"></label>
+    <p class="hint">Make a free key in Google Cloud Console (enable YouTube Data API v3). Reading chat uses quota, so this page polls every few seconds; the free quota covers a few hours of streaming a day.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Twitch</legend>
+    <label>Channel <input type="text" id="twitch" placeholder="yourchannel"></label>
+  </fieldset>
+  <fieldset>
+    <legend>Race</legend>
+    <label>Race length <select id="laps"><option value="6">Sprint · 6 laps (best for chat)</option><option value="12">Standard · 12 laps</option></select></label>
+  </fieldset>
+  <div class="row"><button type="button" class="primary" id="connect">Connect</button><button type="button" id="test">Test with fake chat</button><button type="button" id="reset">Reset championship</button></div>
+  <p class="hint">Tip: put the settings in the address instead, so OBS reconnects on its own: <code>stream.html#kick=ID&amp;twitch=NAME&amp;yt=VIDEO&amp;ytkey=KEY</code>. Keep that address private; it contains your key.</p>
+</aside>
+<script src="js/stream.js"></script>
+</body>
+</html>
