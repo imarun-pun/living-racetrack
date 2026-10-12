@@ -28,17 +28,29 @@ PW.cleanCard = c => {
 };
 const toB64 = s => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const fromB64 = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0)));
-PW.encodeCard = card => toB64(JSON.stringify(PW.cleanCard(card)));
+/* Compact form keeps links short: an array, empty fields dropped from the end, defaults left out.
+   [occasion, to, message, from, flag, number, colour, colour2, customTitle] */
+const OCC = Object.keys(PW.OCCASIONS);
+PW.encodeCard = card => {
+  const c = PW.cleanCard(card);
+  const a = [OCC.indexOf(c.o), c.to, c.m, c.fr, c.fl, c.n === 1 ? '' : c.n, c.c === '#ff4a3d' ? '' : c.c.slice(1), c.c2 === '#1b1f27' ? '' : c.c2.slice(1), c.o === 'custom' ? c.t : ''];
+  while (a.length > 1 && (a[a.length - 1] === '' || a[a.length - 1] === undefined)) a.pop();
+  return toB64(JSON.stringify(a));
+};
 PW.decodeCard = hash => {
   try {
     const raw = String(hash || '').replace(/^#/, '');
     if (!raw || raw.length > 2000) return null;
-    return PW.cleanCard(JSON.parse(fromB64(raw)));
+    const v = JSON.parse(fromB64(raw));
+    if (!Array.isArray(v)) return PW.cleanCard(v);                      // first-version links
+    const [o, to, m, fr, fl, n, c, c2, t] = v;
+    return PW.cleanCard({ o: OCC[o] || 'custom', to, m, fr, fl, n: n === '' || n === undefined ? 1 : n,
+      c: c ? '#' + c : undefined, c2: c2 ? '#' + c2 : undefined, t });
   } catch (e) { return null; }
 };
 /* Where the recipient page lives: next to this page on the web, or the public site when opened from a file. */
 PW.cardLink = card => {
-  const base = /^https?:$/.test(location.protocol) && !/claude\.ai$|claudeusercontent/.test(location.hostname) ? new URL('go.html', location.href).href : PW.HOME + 'go.html';
+  const base = /^https?:$/.test(location.protocol) && !/claude\.ai$|claudeusercontent/.test(location.hostname) ? new URL('z/', location.href.replace(/z\/[^/]*$/, '')).href : PW.HOME + 'z/';
   return base + '#' + PW.encodeCard(card);
 };
 /* Turn a card into what the drive-by draws. */

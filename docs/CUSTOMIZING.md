@@ -54,6 +54,10 @@ In the web app, cars drive by in the ambient view every few minutes (turn it off
 
 Click **Send a drive-by** (or open `send.html`). Pick an occasion, write who it's for and a short message, choose your flag, colour and number, then **Create link and QR code**. Send it by email, text or any app, or print the QR code on a card. The whole message is stored inside the link after the `#`, so nothing is uploaded anywhere.
 
+### Shorter, friendlier links
+
+Links look like `…/living-racetrack/z/#WzAsIlNhYmluYSJd`. In iMessage, WhatsApp, Slack and most email apps they show as a preview card ("Zoooom! A race car is coming for you") instead of a raw address. To drop the GitHub name from the link entirely, buy a short domain (for example `pitwall.fun`), then in the repository open **Settings → Pages → Custom domain**, enter it, and add the DNS records GitHub shows. Links become `pitwall.fun/z/#…`. After switching, update `PW.HOME` in `js/share.js` and the `og:image` address in `z/index.html`.
+
 ## Fantasy league and real race weekends
 
 In **Customize → Season**, add up to eight players and give each two drivers. Their score is those drivers' season points. In **Customize → Tracks**, *Follow the real race calendar* makes Pit Wall race the real weekend's circuit; update `js/calendar.js` once a year with the new dates.

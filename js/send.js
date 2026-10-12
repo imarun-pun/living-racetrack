@@ -55,11 +55,12 @@ $('form').addEventListener('submit', e => {
   const c = card(), url = PW.cardLink(c);
   $('link').value = url; $('open').href = url;
   const who = c.to ? ` for ${c.to}` : '';
-  const text = `${c.fr || 'Someone'} sent you a drive-by${who}. Open it: ${url}`;
-  $('email').href = 'mailto:?subject=' + encodeURIComponent(`A race car is coming${who}`) + '&body=' + encodeURIComponent(text);
+  const lead = `Zoooooom! ${c.fr || 'Someone'} sent you a race car with a special message${who}.`;
+  const text = `${lead} Tap to watch it arrive: ${url}`;
+  $('email').href = 'mailto:?subject=' + encodeURIComponent(`Zoooom! A race car is coming${who}`) + '&body=' + encodeURIComponent(text);
   $('sms').href = 'sms:?&body=' + encodeURIComponent(text);
   $('share').hidden = !navigator.share;
-  $('share').onclick = () => navigator.share({ title: 'A drive-by for you', text: `${c.fr || 'Someone'} sent you a drive-by${who}`, url }).catch(() => {});
+  $('share').onclick = () => navigator.share({ title: 'A drive-by for you', text: lead, url }).catch(() => {});
   drawQR(url);
   $('result').hidden = false;
   $('link').focus(); $('link').select();

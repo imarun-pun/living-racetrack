@@ -19,6 +19,7 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 | **Season** | Every race scores points (25-18-15…, plus fastest lap). Standings carry over, so friends can race each other all season. |
 | **Drive-bys** | A full-size car with a driver's name and flag drives across the screen, slowing down mid-screen so you can read it. The desktop app does it above your taskbar while you work. |
 | **Send a drive-by** | Make a link or QR code for a birthday, congratulations, good luck or your own words. When someone opens it, your car drives across their screen with the message and confetti. Share it by email, text or any app. |
+| **Crashes and recovery** | Crashed cars stay where they stopped until a recovery crane lifts them over the wall and drives off. The safety car leaves from the pit exit, leads the pack and peels back into the pit lane. |
 | **Podium celebration** | The top three climb the podium and spray champagne after every race. |
 | **Fantasy league** | Each friend backs two drivers; their season points decide who wins the league. |
 | **Real race weekends** | On a real race weekend, Pit Wall races that circuit and counts down to the next one. Calendar data only, never live timing. |

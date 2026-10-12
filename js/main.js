@@ -94,6 +94,8 @@ function onEvent(type, d) {
     case 'drying': say('The track is drying · slicks are coming back', 'wx'); break;
     case 'chequered': say(`Chequered flag · ${c.code} wins at ${C.def.name}`, 'red', fav); break;
     case 'done': showPodium(); break;
+    case 'recovery': say(`Recovery crane lifts ${c.code}'s car over the wall`, 'sc', fav); break;
+    case 'cleared': say(`Track clear · ${c.code}'s car is taken away`, 'sc'); break;
     case 'radio': {
       const pos = race.order.indexOf(c), T = PW.TYRES;
       if (!(fav || pos < 6) || performance.now() - radioT < 9000) break;

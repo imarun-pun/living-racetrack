@@ -70,19 +70,17 @@ PW.Renderer = class Renderer {
   /* Realistic circuit: grass, run-off, gravel traps, tyre walls, grandstands, pit garages, grid boxes. */
   drawCircuit(g) {
     const { W, H, C, w } = this, L = C.L, inside = C.inside;
-    // grass with mown stripes and a little texture (seeded so it does not flicker between layouts)
-    g.fillStyle = '#1e3320'; g.fillRect(0, 0, W, H);
-    g.save(); g.globalAlpha = .028; g.fillStyle = '#9fd18f';
-    for (let x = -H; x < W; x += 90) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 45, 0); g.lineTo(x + 45 + H * .6, H); g.lineTo(x + H * .6, H); g.fill(); }
-    g.restore();
-    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    for (let k = 0; k < 2600; k++) { g.fillStyle = rnd() < .5 ? 'rgba(0,0,0,.12)' : 'rgba(170,220,150,.06)'; g.fillRect(rnd() * W, rnd() * H, 2, 2); }
-    const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.max(W, H) * .75);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+    // dark night background, so the circuit pops
+    const hue = C.def.hue || '#38c6ff';
+    g.fillStyle = '#07090d'; g.fillRect(0, 0, W, H);
+    const rg = g.createRadialGradient(W * .6, H * .5, 0, W * .6, H * .5, Math.max(W, H) * .7);
+    rg.addColorStop(0, hue + '16'); rg.addColorStop(1, hue + '00'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(200,215,240,.05)';
+    for (let x = 14; x < W; x += 28) for (let y = 14; y < H; y += 28) g.fillRect(x, y, 1.2, 1.2);
     g.lineJoin = 'round'; g.lineCap = 'round';
+    g.save(); g.strokeStyle = hue; g.globalAlpha = .1; g.lineWidth = w * 4.2; g.shadowColor = hue; g.shadowBlur = 36; g.stroke(this.path); g.restore();
     // verge and run-off
-    g.strokeStyle = '#2c4a2b'; g.lineWidth = w * 3.6; g.stroke(this.path);
-    g.strokeStyle = '#5a6066'; g.globalAlpha = .55; g.lineWidth = w * 1.9; g.stroke(this.path); g.globalAlpha = 1;
+    g.strokeStyle = '#2a2f37'; g.globalAlpha = .7; g.lineWidth = w * 1.9; g.stroke(this.path); g.globalAlpha = 1;
     // gravel traps and tyre walls on the outside of corners
     C.corners.forEach(ci => {
       const s = ci * C.ds, side = -Math.sign(C.K[ci]);
@@ -207,6 +205,31 @@ PW.Renderer = class Renderer {
     g.restore();
   }
 
+  /* Recovery timeline (simulated seconds): truck arrives 0–7, crane lifts the car over the wall 7–15, truck leaves with it 15–24. */
+  recoveryPose(c) {
+    const t = c.recov.t, side = c.outSide || 1, e = v => v < 0 ? 0 : v > 1 ? 1 : v * v * (3 - 2 * v);
+    const lift = e((t - 7) / 8), go = e((t - 15) / 9);
+    return { s: c.dist + go * 160, lat: c.lat + (side * 6.4 - c.lat) * lift, k: 1 + .3 * Math.sin(Math.PI * Math.min(1, lift)) * (1 - go) + (lift >= 1 ? 0 : 0), alpha: 1 - e((t - 21) / 3) };
+  }
+  drawRecovery(ctx, c, latPx, len, wid, now) {
+    const t = c.recov.t, side = c.outSide || 1, e = v => v < 0 ? 0 : v > 1 ? 1 : v * v * (3 - 2 * v);
+    const arrive = e(t / 7), go = e((t - 15) / 9), alpha = Math.min(arrive * 1.5, 1) * (1 - e((t - 21) / 3));
+    const s = c.dist - 110 * (1 - arrive) + 14 + go * 160, lat = side * 7.6;
+    const [x, y, a] = this.at(s, lat * latPx), tl = len * 1.6, tw = wid * 1.55;
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(-tl / 2 + 1.5, -tw / 2 + 1.5, tl, tw);
+    ctx.fillStyle = '#d9dde5'; ctx.fillRect(-tl / 2, -tw / 2, tl * .68, tw);                 // flatbed
+    ctx.fillStyle = '#ff8a00'; ctx.fillRect(tl * .2, -tw / 2, tl * .3, tw);                  // cab
+    ctx.fillStyle = Math.floor(now / 220) % 2 ? '#ffc21a' : '#5a3a00'; ctx.fillRect(tl * .2, -tw * .45, tl * .06, tw * .9);   // beacon
+    ctx.restore();
+    // crane arm from the truck to the car while lifting
+    if (t > 6 && t < 16) {
+      const [cx, cy] = this.at(c.dist, (c.lat + (side * 6.4 - c.lat) * e((t - 7) / 8)) * latPx);
+      ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = Math.max(2, wid * .3); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(cx, cy); ctx.stroke();
+      ctx.strokeStyle = '#1a1300'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(cx, cy); ctx.stroke(); ctx.restore();
+    }
+  }
   draw(race, now, dtR, view) {
     const ctx = this.ctx, C = this.C, w = this.w, W = this.W, H = this.H, L = C.L;
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.layer, 0, 0);
@@ -248,25 +271,30 @@ PW.Renderer = class Renderer {
     this.puffs = this.puffs.filter(p => (p.life -= dtR * .9) > 0);
     for (const p of this.puffs) { ctx.fillStyle = `rgba(210,215,225,${.22 * p.life})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (2.6 - 1.6 * p.life), 0, 6.29); ctx.fill(); }
     // safety car
-    const lead = race.running()[0];
-    if (race.sc && race.sc.state === 'out' && lead) {
-      const [x, y, a] = this.at(lead.dist + 45, 0);
+    if (race.scCar) {
+      const sc = race.scCar, [x, y, a] = this.at(sc.dist, sc.lat * latPx);
       ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.shadowColor = '#ffc21a'; ctx.shadowBlur = 14 + 8 * Math.sin(now / 120);
       ctx.fillStyle = '#ffc21a'; ctx.beginPath(); ctx.roundRect(-len * .55, -wid * .65, len * 1.1, wid * 1.3, wid * .4); ctx.fill();
-      ctx.shadowBlur = 0; ctx.fillStyle = Math.floor(now / 250) % 2 ? '#ff8a00' : '#1a1300'; ctx.fillRect(-len * .08, -wid * .5, len * .16, wid);
+      ctx.shadowBlur = 0; ctx.fillStyle = '#1a1300'; ctx.fillRect(len * .1, -wid * .45, len * .22, wid * .9);           // windscreen
+      ctx.fillStyle = Math.floor(now / 250) % 2 ? '#ff8a00' : '#2a6cff'; ctx.fillRect(-len * .12, -wid * .55, len * .1, wid * 1.1); // light bar
       ctx.restore();
+      if (w >= 9) { const [lx, ly] = this.at(sc.dist, sc.lat * latPx - C.inside * (w * 1.3 + 6)); ctx.font = `700 ${Math.max(9, w * .55)}px "JetBrains Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffc21a'; ctx.fillText('SC', lx, ly); }
     }
+    // recovery trucks
+    for (const c of race.cars) if (c.recov && !c.cleared) this.drawRecovery(ctx, c, latPx, len, wid, now);
     // cars
     for (const c of order) {
       if (c.cleared) continue;
-      const [x, y, a] = this.at(c.dist, c.lat * latPx);
+      const pose = c.recov ? this.recoveryPose(c) : null;
+      const [x, y, a] = this.at(pose ? pose.s : c.dist, (pose ? pose.lat : c.lat) * latPx);
       ctx.save(); ctx.translate(x, y); ctx.rotate(a + c.yaw);
-      if (c.out) ctx.globalAlpha = .55;
+      if (pose) { ctx.scale(pose.k, pose.k); ctx.globalAlpha = pose.alpha; }
+      else if (c.out) ctx.globalAlpha = .55;
       if (this.style === 'circuit') { ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1.5; }
       else { ctx.shadowColor = c.color; ctx.shadowBlur = this.reduce || c.out ? 0 : w * .8; }
       PW.drawCarTop(ctx, len, wid, c.color, c.color2, detail);
       ctx.restore();
-      if (c.out && Math.floor(now / 400) % 2) { ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, len * .9, 0, 6.29); ctx.stroke(); }
+      if (c.out && !pose && Math.floor(now / 400) % 2) { ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, len * .9, 0, 6.29); ctx.stroke(); }
       if (view.fav === c.team && !c.out) { ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = .5 + .3 * Math.sin(now / 250); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, len * .85, 0, 6.29); ctx.stroke(); ctx.globalAlpha = 1; }
     }
     // labels

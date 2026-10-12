@@ -13,6 +13,8 @@ Living Racetrack starts as free software anyone can put on a screen, and grows i
 
 **v0.5:** send-a-drive-by links and QR codes; podium champagne celebration; fantasy league; real race-weekend calendar; realistic circuit map with gravel traps, grandstands and pit garages; world locator; map zoom; choose the drive-by car.
 
+**v0.6:** realistic map on a black background; real safety car that leaves and returns through the pit lane; crane recovery of crashed cars; short `z/` links with preview cards.
+
 ## Next features
 
 ### Make it yours

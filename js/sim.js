@@ -61,7 +61,7 @@ PW.Race = class Race {
       c.inPit = false; c.stopped = false; c.puncture = false; c.radioPit = false; c.lapStart = null; c.cp = Math.floor(c.dist / (L / CP)); c.cpT = this.t;
     }
     this.leaderCp.length = Math.max(0, Math.floor(base / (L / CP)) - 30);
-    this.debris = []; this.sc = null; this.yellow = null; this.red = null;
+    this.debris = []; this.sc = null; this.scCar = null; this.yellow = null; this.red = null;
     this.state = 'grid';
     this.emit('regrid', { lap: Math.floor(base / L) + 1 });
   }
@@ -91,7 +91,12 @@ PW.Race = class Race {
       const wet = c.tyre === 'I' ? .905 + .02 * W.rain : 1 - .22 * W.rain;
       let target = C.V[i] * c.pace * (ty.base - ty.deg * c.tyreLaps) * wet * (1 + c.noise) * (c.puncture ? .72 : 1);
       if (c.finished) target = Math.min(target, C.V[i] * .55);
-      if (this.sc) target = c === leader ? Math.min(target, 38) : Math.min(target, C.V[i] * .85);
+      if (this.sc) {
+        target = Math.min(target, C.V[i] * .85);
+        const sc = this.scCar;
+        if (c === leader && sc && sc.onTrack) { const gapSC = sc.dist - c.dist; if (gapSC > 0 && gapSC < 70) target = Math.min(target, sc.v * (gapSC < 40 ? .9 : 1)); }
+        else if (c === leader) target = Math.min(target, 45);
+      }
       if (this.yellow && Math.abs(mod(this.yellow.s - c.dist + L / 2, L) - L / 2) < 200) target *= .9;
       if (this.state === 'red') target = 0;
       if (this.state === 'racing' && this.t - this.startT < c.react) target = 0;
@@ -113,7 +118,7 @@ PW.Race = class Race {
         const cr = c.crash; cr.t += dt;
         c.v = Math.max(0, c.v - 38 * dt); target = 0;
         c.latT = cr.side * 3.9; c.yaw += (cr.yaw - c.yaw) * Math.min(1, dt * 2);
-        if (c.v < .5) { c.out = true; c.v = 0; c.crash = null; c.outAt = this.t; this.emit('out', { car: c }); this.afterCrash(c); }
+        if (c.v < .5) { c.out = true; c.v = 0; c.outSide = c.crash.side; c.crash = null; c.outAt = this.t; c.recov = { t: 0, lifted: false }; this.emit('out', { car: c }); this.afterCrash(c); }
       }
       // pit decisions
       if (this.state === 'racing' && !c.inPit && !c.finished && !c.crash) {
@@ -189,11 +194,37 @@ PW.Race = class Race {
         if (cp > 0 && cp % CP === 0) this.lapDone(c, cp / CP);
       }
     }
+    // recovery crane: arrives, lifts the car over the wall, drives away; then the track is clear
+    for (const c of cars) {
+      if (!c.recov || c.cleared) continue;
+      const r = c.recov; r.t += dt;
+      if (!r.lifted && r.t > 7) { r.lifted = true; this.emit('recovery', { car: c }); }
+      if (this.yellow) this.yellow.until = Math.max(this.yellow.until, this.t + 2);
+      if (r.t > 24) { c.cleared = true; this.debris = this.debris.filter(d => Math.abs(d.s - c.dist) > 80); this.emit('cleared', { car: c }); }
+    }
+    const recovering = cars.some(c => c.recov && !c.cleared);
+    // physical safety car: leaves the pit exit, leads the pack, peels into the pit lane when it comes in
+    const sc = this.scCar;
+    if (sc) {
+      const lead = this.running()[0], s = mod(sc.dist, L), i = Math.min(PW.N - 1, Math.floor(s / C.ds));
+      const gapLead = lead ? sc.dist - lead.dist : 200;
+      let target = Math.min(C.V[i] * .6, 42);
+      if (sc.phase === 'exit') { target = Math.min(target, 22); if (s > L * .09 && s < L * .5) { sc.phase = 'track'; } }
+      if (sc.phase === 'track' && gapLead > 140) target = Math.min(target, 14);            // wait for the leader
+      if (sc.phase === 'track' && this.sc && this.sc.state === 'in' && s > L * .915 && s < L * .99) sc.phase = 'pit';
+      if (sc.phase === 'pit') { target = 22; if (s < L * .5 && s > L * .065) { this.scCar = null; } }
+      if (this.scCar) {
+        sc.v += Math.sign(target - sc.v) * Math.min(Math.abs(target - sc.v), 12 * dt); sc.dist += sc.v * dt;
+        sc.latT = sc.phase === 'track' ? 0 : C.inside * 2.95; sc.lat += (sc.latT - sc.lat) * Math.min(1, dt * 1.2);
+        sc.onTrack = sc.phase === 'track';
+      }
+    }
     // safety car phases
     if (this.sc && leader) {
       const ll = Math.floor(leader.dist / L);
-      if (this.sc.state === 'out' && ll >= this.sc.endLap) { this.sc.state = 'in'; this.emit('sc-in', {}); }
-      else if (this.sc.state === 'in' && ll >= this.sc.endLap + 1) { this.sc = null; this.debris = []; this.emit('green', {}); }
+      if (this.sc.state === 'out' && ll >= this.sc.endLap && !recovering) { this.sc.state = 'in'; this.emit('sc-in', {}); }
+      else if (this.sc.state === 'out' && ll >= this.sc.endLap && recovering) this.sc.endLap = ll + 1;
+      else if (this.sc.state === 'in' && ll >= this.sc.endLap + 1 && !this.scCar) { this.sc = null; this.debris = []; this.emit('green', {}); }
     }
     // order and overtakes
     const prevOrder = this.order;
@@ -238,13 +269,16 @@ PW.Race = class Race {
     const lapsLeft = this.laps - this.leaderLap();
     const r = Math.random();
     if (!this.redUsed && lapsLeft > 3 && r < .18) {
-      this.redUsed = true; this.state = 'red'; this.red = { t: this.t, phase: 'stopping' }; this.sc = null;
+      this.redUsed = true; this.state = 'red'; this.red = { t: this.t, phase: 'stopping' }; this.sc = null; this.scCar = null;
       this.emit('red', { car: c });
     } else if (!this.sc && r < .8) this.deploySC('crash', c);
   }
   deploySC(reason, car) {
     const leader = this.running()[0]; if (!leader) return;
     this.sc = { state: 'out', endLap: Math.floor(leader.dist / this.C.L) + 2, reason };
+    const L = this.C.L, base = Math.floor(leader.dist / L) * L + L * .02;
+    const exitDist = base + (base - leader.dist > 30 ? 0 : L);
+    this.scCar = { dist: exitDist, v: 12, lat: this.C.inside * 2.95, latT: this.C.inside * 2.95, phase: 'exit', onTrack: false };
     for (const c of this.running()) if (!c.planDone && c.dist / this.C.L > this.laps * .3 && Math.random() < .55) c.pitNext = true;
     this.emit('sc', { reason, car });
   }

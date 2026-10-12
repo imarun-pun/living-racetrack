@@ -47,6 +47,6 @@ function loop(now) {
 }
 $('replay').addEventListener('click', play);
 // Send one back: prefill the sender as the new recipient
-$('reply').href = 'send.html' + (card.fr ? '#to=' + encodeURIComponent(card.fr.slice(0, 20)) : '');
+$('reply').href = '../send.html' + (card.fr ? '#to=' + encodeURIComponent(card.fr.slice(0, 20)) : '');
 play();
 })();
