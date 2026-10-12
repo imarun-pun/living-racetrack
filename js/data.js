@@ -117,6 +117,12 @@ PW.DEFAULT_SETTINGS = {
   mapZoom: 'normal',        // close | normal | wide
   weekendSync: true,        // follow the real race calendar
   players: [],              // fantasy league: { name, a, b }
+  format: 'standard',       // standard | reverse | elimination
+  cup: null,                // elimination cup state { alive: [slots], round, champs: [] }
+  view: 'map',              // map | chase | onboard
+  camCar: 0,                // -1 leader, otherwise a driver slot
+  locator: 'auto',          // auto | on | off
+  career: { on: false },
   reminders: { water: true, waterMins: 60, stretch: false, stretchMins: 90, eyes: false, eyesMins: 30, custom: '', customMins: 0 },
   custom: []                // imported tracks
 };

@@ -15,6 +15,8 @@ Living Racetrack starts as free software anyone can put on a screen, and grows i
 
 **v0.6:** realistic map on a black background; real safety car that leaves and returns through the pit lane; crane recovery of crashed cars; short `z/` links with preview cards.
 
+**v0.7:** chase cam and onboard view; career mode with upgrades and team offers; Elimination Cup; reverse-grid races; world map hides itself when it would cover the track.
+
 ## Next features
 
 ### Make it yours

@@ -23,7 +23,7 @@
 html, body { height: 100%; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); overflow: hidden; }
-#track { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#track, #onboard { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .hud { position: fixed; inset: 0; pointer-events: none; }
 .hud > * { position: absolute; }
 body.dim #track, body.dim .hud { filter: brightness(.42) saturate(.8); }
@@ -168,6 +168,14 @@ body.dim #track, body.dim .hud { filter: brightness(.42) saturate(.8); }
 .locator figcaption { font: 500 10px/1.3 var(--mono); letter-spacing: .1em; color: var(--muted); text-align: right; }
 body.ambient .locator { top: calc(24px + env(safe-area-inset-top, 0px)); left: 28px; right: auto; }
 .players { display: grid; gap: 6px; }
+.career { display: grid; gap: 10px; }
+.career .stat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.career .stat div { background: #151a23; border: 1px solid var(--line); border-radius: 4px; padding: 8px; display: grid; gap: 4px; }
+.career .stat b { font: 700 20px/1 var(--display); }
+.career .stat span { font: 500 10px/1 var(--mono); letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+.career .up { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; font: 500 14px/1.2 var(--body); }
+.career .pips { font: 600 12px/1 var(--mono); color: var(--green); letter-spacing: .1em; }
+.career .offer { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .player-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 30px; gap: 6px; align-items: center; }
 .player-row button { padding: 6px 0; }
 a.btn { text-decoration: none; display: inline-flex; align-items: center; }

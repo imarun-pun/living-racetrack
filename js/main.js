@@ -16,6 +16,18 @@ function load() {
   s.players = Array.isArray(s.players) ? s.players.slice(0, 8).map(p => ({ name: String((p && p.name) || 'Player').replace(/[<>\u0000-\u001f]/g, '').slice(0, 16), a: Math.max(0, Math.min(19, +(p && p.a) || 0)), b: Math.max(0, Math.min(19, +(p && p.b) || 0)) })) : [];
   if (!['circuit', 'neon'].includes(s.mapStyle)) s.mapStyle = 'circuit';
   if (!['close', 'normal', 'wide'].includes(s.mapZoom)) s.mapZoom = 'normal';
+  if (!['standard', 'reverse', 'elimination'].includes(s.format)) s.format = 'standard';
+  if (!['map', 'chase', 'onboard'].includes(s.view)) s.view = 'map';
+  if (!['auto', 'on', 'off'].includes(s.locator)) s.locator = 'auto';
+  s.camCar = Number.isInteger(+s.camCar) && +s.camCar >= -1 && +s.camCar < 20 ? +s.camCar : 0;
+  const slots = a => Array.isArray(a) ? [...new Set(a.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < 20))] : [];
+  s.cup = s.cup && typeof s.cup === 'object' ? { alive: slots(s.cup.alive), round: Math.max(1, +s.cup.round || 1), champs: Array.isArray(s.cup.champs) ? s.cup.champs.slice(-10) : [] } : null;
+  if (s.cup && s.cup.alive.length < 2) s.cup = null;
+  const k = s.career && typeof s.career === 'object' ? s.career : {};
+  s.career = k.on ? { on: true, slot: Math.max(0, Math.min(19, +k.slot || 0)), season: Math.max(1, +k.season || 1), race: Math.max(0, +k.race || 0), per: 8,
+    dev: Math.max(0, +k.dev || 0), up: { engine: Math.min(5, +(k.up && k.up.engine) || 0), aero: Math.min(5, +(k.up && k.up.aero) || 0), tyres: Math.min(5, +(k.up && k.up.tyres) || 0) },
+    order: slots(k.order).length === 10 ? slots(k.order) : PW.DEFAULT_TEAMS.map((t, i) => i), offers: Array.isArray(k.offers) ? slots(k.offers) : null,
+    history: Array.isArray(k.history) ? k.history.slice(-20) : [] } : { on: false };
   s.drivebyDriver = Number.isInteger(+s.drivebyDriver) && +s.drivebyDriver >= -1 && +s.drivebyDriver < 20 ? +s.drivebyDriver : -1;
   return s;
 }
@@ -43,6 +55,13 @@ const pitcam = new PW.PitCam($('pitcam'));
 const garage = new PW.Garage($('garage'));
 const driveBy = new PW.DriveBy($('driveby'));
 const celebration = new PW.Celebration($('celebrate'));
+const onboard = new PW.Onboard($('onboard'));
+const VIEWS = { map: 'TV map', chase: 'Chase cam', onboard: 'Onboard' };
+/* The car the cameras follow: your chosen driver, or the leader if that car is out or not in this race. */
+function camCar() {
+  const c = S.camCar >= 0 ? race.cars.find(x => x.i === S.camCar) : null;
+  return c && !c.cleared ? c : race.running()[0] || race.cars[0];
+}
 let nextDrive = performance.now() + 45000;
 let C, race, TS = 3, phase = 'race', phaseT = 0, round = 1, lightsT = 0, hold = 1, paused = false, nextDef = null, fade = null;
 const pairT = {};
@@ -51,14 +70,20 @@ let msgs = [], bannerT = 0, firstStart = true, pendT = 0, garageInfo = null, rad
 function newRace(def) {
   C = PW.buildCircuit(def); renderer.setCircuit(C);
   TS = C.T / S.lapSeconds;
-  race = new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams(), drivers: drivers() });
+  if (S.format === 'elimination' && !S.cup) S.cup = { alive: drivers().map((d, i) => i), round: 1, champs: [] };
+  const K = S.career;
+  race = new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams(), drivers: drivers(), format: S.format,
+    entrants: S.format === 'elimination' ? S.cup.alive : null,
+    teamOrder: K.on ? K.order : null, bonus: K.on ? { [K.slot]: (K.up.engine + K.up.aero + K.up.tyres) * .0013 } : null });
   race.on(onEvent);
   phase = 'race'; phaseT = 0; lightsT = 0; hold = rnd(.6, 2.2); firstStart = true; fade = null;
   pitcam.clear(); garage.hide(); $('podium').hidden = true; celebration.stop(); hideBanner(); $('fader').classList.remove('on');
   document.documentElement.style.setProperty('--accent', def.hue || '#38c6ff');
   const wk = PW.weekendNow && PW.weekendNow();
   const kind = wk && def.id === wk.track ? 'Real race weekend · ' + PW.weekendLabel(wk) : def.kind === 'real' ? 'Real-layout replica' : def.kind === 'custom' ? 'Imported track' : 'Original circuit';
-  $('round').textContent = round; $('kind').textContent = kind + ' · Simulated race';
+  const fmt = S.format === 'elimination' ? ` · Elimination Cup ${S.cup.alive.length <= 4 ? 'final' : 'round ' + S.cup.round} · ${S.cup.alive.length} drivers` : S.format === 'reverse' ? ' · Reverse grid' : '';
+  const car = K.on ? ` · Career S${K.season} race ${K.race + 1}/${K.per}` : '';
+  $('round').textContent = round; $('kind').textContent = kind + fmt + car + ' · Simulated race';
   $('cname').textContent = def.name; $('aname').textContent = def.name; $('aplace').textContent = def.place || kind;
   $('alen').textContent = (C.L / 1000).toFixed(3) + ' km'; $('acorn').textContent = C.corners.length; $('alaps').textContent = S.laps;
   nextDef = pickNext(def);
@@ -132,7 +157,85 @@ function awardPoints() {
   race.finishOrder.forEach((c, p) => { if (p < 10) se.pts[c.i] = (se.pts[c.i] || 0) + PW.POINTS[p]; });
   const fl = race.fl.car; if (fl && fl.finished && fl.fpos < 10) se.pts[fl.i] = (se.pts[fl.i] || 0) + 1;
   if (race.finishOrder[0]) se.wins[race.finishOrder[0].i] = (se.wins[race.finishOrder[0].i] || 0) + 1;
-  se.races = (se.races || 0) + 1; save(); renderSeason();
+  se.races = (se.races || 0) + 1;
+  if (S.career.on) careerAfterRace();
+  if (S.format === 'elimination' && S.cup) cupAfterRace();
+  save(); renderSeason(); renderCareer(); renderCupInfo();
+}
+// ---------- Career ----------
+const UPGRADES = [['engine', 'Engine', 'More straight-line speed'], ['aero', 'Aerodynamics', 'Faster through corners'], ['tyres', 'Tyre management', 'Less wear, better grip']];
+const upCost = lvl => 15 * (lvl + 1);
+function careerStart(slot) {
+  const team = Math.floor(slot / 2), order = PW.DEFAULT_TEAMS.map((t, i) => i).filter(t => t !== team).sort(() => Math.random() - .5);
+  order.push(team);                                         // you start in the slowest car
+  S.career = { on: true, slot, season: 1, race: 0, per: 8, dev: 0, up: { engine: 0, aero: 0, tyres: 0 }, order, offers: null, history: [] };
+  S.season = { pts: [], wins: [], races: 0 }; S.favTeam = team; S.camCar = slot; save();
+}
+function careerAfterRace() {
+  const K = S.career, me = race.cars.find(c => c.i === K.slot); if (!me) return;
+  const mate = race.cars.find(c => c.i === (K.slot ^ 1)), pos = me.finished ? me.fpos : -1;
+  let dev = pos >= 0 ? (PW.POINTS[pos] || 0) + 2 : 0;
+  if (pos >= 0 && mate && (!mate.finished || mate.fpos > pos)) dev += 5;
+  if (race.fl.car === me) dev += 3;
+  K.dev += dev; K.race++; K.last = dev;
+  say(pos >= 0 ? `Career: P${pos + 1} · +${dev} development points` : 'Career: no finish · no development points', 'radio', true, 'CAREER');
+  if (K.race >= K.per) {
+    const p = standings(20).findIndex(d => d.i === K.slot) + 1, r = K.order.indexOf(Math.floor(K.slot / 2));
+    const best = p <= 3 ? 0 : p <= 6 ? Math.max(0, r - 3) : p <= 10 ? Math.max(0, r - 1) : r;
+    K.offers = K.order.slice(best, r).sort(() => Math.random() - .5).slice(0, 3);
+    K.history.push({ season: K.season, pos: p, team: teams()[Math.floor(K.slot / 2)].name, pts: (S.season.pts[K.slot] || 0) });
+    K.final = p;
+    say(`Season ${K.season} over · you finished P${p}${K.offers.length ? ' · ' + K.offers.length + ' team offer' + (K.offers.length > 1 ? 's' : '') + ' waiting in Customize' : ''}`, 'fl', true, 'CAREER');
+  }
+}
+function careerSign(teamIdx) {
+  const K = S.career, cur = Math.floor(K.slot / 2);
+  if (teamIdx !== cur) {
+    const D = drivers(), a = K.slot, b = teamIdx * 2, A = { name: D[a].name, flag: D[a].flag, num: D[a].num }, B = { name: D[b].name, flag: D[b].flag, num: D[b].num };
+    S.drivers = D.map(d => ({ name: d.name, flag: d.flag, num: d.num })); S.drivers[a] = B; S.drivers[b] = A;
+    K.slot = b; K.up = { engine: 0, aero: 0, tyres: 0 }; S.favTeam = teamIdx; S.camCar = b;
+  }
+  const i = Math.floor(Math.random() * 9); [K.order[i], K.order[i + 1]] = [K.order[i + 1], K.order[i]];   // a little shake-up each winter
+  K.season++; K.race = 0; K.offers = null; K.final = null; S.season = { pts: [], wins: [], races: 0 };
+  save(); syncForm(); round++; newRace(pickNext(C.def));
+}
+function renderCareer() {
+  const el = $('s-career'), K = S.career, D = drivers(), T = teams();
+  if (!K.on) {
+    el.innerHTML = `<label class="field">You are <select id="cr-slot">${D.map((d, i) => `<option value="${i}">#${d.num} ${PW.esc(d.name)}</option>`).join('')}</select></label>` +
+      '<div class="row-btns"><button type="button" id="cr-start">Start my career</button></div>';
+    $('cr-slot').value = S.camCar >= 0 ? S.camCar : 0;
+    $('cr-start').onclick = () => { careerStart(+$('cr-slot').value); syncForm(); round++; newRace(pickNext(C.def)); };
+    return;
+  }
+  const me = D[K.slot], team = T[Math.floor(K.slot / 2)], rank = K.order.indexOf(Math.floor(K.slot / 2)) + 1;
+  const p = standings(20).findIndex(d => d.i === K.slot) + 1;
+  el.innerHTML = `<div class="stat"><div><span>Season ${K.season}</span><b>Race ${Math.min(K.race + 1, K.per)}/${K.per}</b></div><div><span>Standing</span><b>P${p || '–'}</b></div><div><span>Dev points</span><b>${K.dev}</b></div></div>` +
+    `<p class="hint">${PW.esc(me.name)} · ${PW.esc(team.name)} (car ranked ${rank} of 10)</p>` +
+    UPGRADES.map(([k, n, d]) => `<div class="up"><span>${n}<br><small class="hint">${d}</small></span><span class="pips">${'■'.repeat(K.up[k])}${'□'.repeat(5 - K.up[k])}</span>` +
+      `<button type="button" data-up="${k}" ${K.up[k] >= 5 || K.dev < upCost(K.up[k]) ? 'disabled' : ''}>${K.up[k] >= 5 ? 'Maxed' : 'Upgrade · ' + upCost(K.up[k])}</button></div>`).join('') +
+    (K.offers ? `<p class="hint"><b>Season over: you finished P${K.final}.</b> Choose where to race next season.</p>` +
+      K.offers.map(t => `<div class="offer"><span>${PW.esc(T[t].name)} · car ranked ${K.order.indexOf(t) + 1}</span><button type="button" data-sign="${t}">Sign</button></div>`).join('') +
+      `<div class="offer"><span>Stay at ${PW.esc(team.name)}</span><button type="button" data-sign="${Math.floor(K.slot / 2)}">Stay</button></div>` : '') +
+    (K.history.length ? `<p class="hint">History: ${K.history.map(h => `S${h.season} P${h.pos} (${PW.esc(h.team)})`).join(' · ')}</p>` : '') +
+    '<div class="row-btns"><button type="button" id="cr-end">End career</button></div>';
+  el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const k = b.dataset.up; if (K.dev >= upCost(K.up[k]) && K.up[k] < 5) { K.dev -= upCost(K.up[k]); K.up[k]++; save(); renderCareer(); say(`Upgrade fitted: ${UPGRADES.find(u => u[0] === k)[1]} level ${K.up[k]} · from the next race`, 'radio', true, 'CAREER'); } });
+  el.querySelectorAll('[data-sign]').forEach(b => b.onclick = () => careerSign(+b.dataset.sign));
+  $('cr-end').onclick = () => { S.career = { on: false }; save(); renderCareer(); };
+}
+// ---------- Elimination Cup ----------
+function cupAfterRace() {
+  const cup = S.cup, D = drivers();
+  const cls = [...race.finishOrder, ...race.order.filter(c => !c.finished && !c.out), ...race.order.filter(c => c.out)].map(c => c.i);
+  if (cup.alive.length <= 4) {
+    const champ = race.finishOrder[0];
+    if (champ) { cup.champs.push({ name: champ.name, flag: champ.flag }); say(`${champ.name} wins the Elimination Cup!`, 'fl', champ.team === S.favTeam, 'CUP'); banner('Cup champion', champ.name, 'go', 4); }
+    S.cup = { alive: D.map((d, i) => i), round: 1, champs: cup.champs.slice(-10) };
+    return;
+  }
+  const k = Math.max(2, Math.round(cup.alive.length * .25)), out = cls.slice(-k);
+  cup.alive = cls.slice(0, -k); cup.round++;
+  say(`Eliminated: ${out.map(i => D[i].code).join(', ')} · ${cup.alive.length} drivers go through${cup.alive.length <= 4 ? ' to the final' : ''}`, 'red', false, 'CUP');
 }
 function standings(n = 20) {
   const se = S.season || { pts: [] }, D = drivers(), T = teams();
@@ -161,7 +264,7 @@ function showPodium() {
   celebration.start(race.finishOrder.slice(0, 3).map(c => ({ name: c.name, code: c.code, flag: c.flag, color: c.color, color2: c.color2 })));
   const lg = league(); $('pnext').dataset.season += lg.length ? ` · League: ${lg.slice(0, 2).map(p => `${p.name} ${p.pts}`).join(', ')}` : '';
   const useFav = S.favTeam >= 0 && round % 2 === 0;
-  const ti = useFav ? S.favTeam : p1.team, a = race.cars[ti * 2], b = race.cars[ti * 2 + 1];
+  const ti = useFav ? S.favTeam : p1.team, slotCar = i => race.cars.find(c => c.i === i) || { num: drivers()[i].num, name: drivers()[i].name }, a = slotCar(ti * 2), b = slotCar(ti * 2 + 1);
   garageInfo = { team: T[ti], num: ti === p1.team ? p1.num : a.num, drivers: [a, b].map(c => `#${c.num} ${c.name}`),
     fact: PW.FACTS[Math.floor(Math.random() * PW.FACTS.length)], why: useFav ? 'Your team' : 'Race winner', tyreC: PW.TYRES[p1.tyre].c,
     seasonTitle: `Championship · after ${S.season.races} race${S.season.races === 1 ? '' : 's'}`, standings: standings(6) };
@@ -225,10 +328,14 @@ function renderClock() {
 // ---------- Layout ----------
 function drawLocator() {
   const d = C && C.def, el = $('locator');
-  el.hidden = !(d && typeof d.lat === 'number');
+  el.hidden = !(d && typeof d.lat === 'number') || S.locator === 'off' || S.view !== 'map';
   if (el.hidden) return;
   PW.drawLocator(el.querySelector('canvas'), d.lat, d.lon, d.hue || '#38c6ff');
   $('loccap').textContent = PW.fmtCoord(d.lat, d.lon);
+  if (S.locator === 'auto') {                         // hide it if it sits on top of the track
+    const b = renderer.bounds(), r = el.getBoundingClientRect();
+    if (r.left < b.x1 && r.right > b.x0 && r.top < b.y1 && r.bottom > b.y0) el.hidden = true;
+  }
 }
 function layout() {
   const DPR = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight, narrow = W < 760;
@@ -238,7 +345,7 @@ function layout() {
   if (S.mode === 'ambient') r = narrow ? { x: 16, y: H * .16, w: W - 32, h: H * .5 } : { x: W * .05, y: H * .1, w: W * .9, h: H * .62 };
   else if (narrow) r = { x: 16, y: 150, w: W - 32, h: Math.max(140, H - 150 - (5 * row + 120)) };
   else r = { x: 290, y: 104, w: W - 290 - 36, h: H - 104 - 120 };
-  renderer.layout(W, H, DPR, r, { style: S.mapStyle, zoom: S.mapZoom });
+  renderer.layout(W, H, DPR, r, { style: S.mapStyle, zoom: S.mapZoom, hires: S.view === 'chase' });
 }
 
 // ---------- Loop ----------
@@ -287,7 +394,10 @@ function frame(now) {
     }
     if (bannerT > 0) { bannerT -= dtR; if (bannerT <= 0) hideBanner(); }
   }
-  if (phase !== 'garage') renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race', fav: S.favTeam });
+  const onb = S.view === 'onboard' && phase !== 'garage';
+  $('onboard').hidden = !onb;
+  if (phase !== 'garage' && !onb) renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race' && S.view === 'map', fav: S.favTeam, cam: S.view === 'chase' ? camCar() : null });
+  if (onb) onboard.draw(race, camCar(), now, paused ? 0 : dtR);
   if (!driveBy.active && phase !== 'garage' && !paused) checkReminders(now);
   if (S.driveby && S.mode === 'ambient' && phase === 'race' && !driveBy.active && now > nextDrive) startDriveBy();
   if (driveBy.active) driveBy.update(paused ? 0 : dtR);
@@ -304,7 +414,7 @@ let lightsOff = 0;
 function startDriveBy(board) {
   const pool = race.cars.filter(c => !c.out), favs = pool.filter(c => c.team === S.favTeam);
   const list = favs.length && Math.random() < .5 ? favs : pool;
-  const car = S.drivebyDriver >= 0 ? race.cars[S.drivebyDriver] : list[Math.floor(Math.random() * list.length)] || race.cars[0];
+  const car = S.drivebyDriver >= 0 ? (race.cars.find(c => c.i === S.drivebyDriver) || { ...drivers()[S.drivebyDriver], i: S.drivebyDriver, team: Math.floor(S.drivebyDriver / 2), tyre: 'M' }) : list[Math.floor(Math.random() * list.length)] || race.cars[0];
   driveBy.start({ name: car.name, flag: car.flag, num: car.num, team: teams()[car.team], tyre: car.tyre, sound: false,
     seconds: PW.DRIVEBY_SPEEDS[S.drivebySpeed] || PW.DRIVEBY_SPEEDS.cruise, board });
   if (!board) nextDrive = performance.now() + S.drivebyMins * 60000 * (.6 + Math.random() * .8);
@@ -325,6 +435,11 @@ function checkReminders(now) {
   }
 }
 
+function setView(v) {
+  S.view = v; save(); $('bview').textContent = 'View: ' + VIEWS[v]; $('s-view').value = v;
+  document.body.classList.toggle('onboard', v === 'onboard'); layout(); drawLocator();
+}
+
 // ---------- Controls ----------
 function setMode(m) {
   S.mode = m; save(); document.body.classList.toggle('ambient', m === 'ambient');
@@ -340,6 +455,7 @@ async function fullscreen() {
 const openSettings = open => { $('settings').hidden = !open; if (open) { document.body.classList.remove('idle'); $('sclose').focus(); } };
 $('bmode').addEventListener('click', () => setMode(S.mode === 'ambient' ? 'race' : 'ambient'));
 $('bnext').addEventListener('click', nextRace);
+$('bview').addEventListener('click', () => { const k = Object.keys(VIEWS); setView(k[(k.indexOf(S.view) + 1) % k.length]); });
 $('bfull').addEventListener('click', fullscreen);
 $('bset').addEventListener('click', () => openSettings($('settings').hidden));
 $('sclose').addEventListener('click', () => openSettings(false));
@@ -352,6 +468,7 @@ addEventListener('keydown', e => {
   else if (k === 'f') fullscreen();
   else if (k === 'p') { paused = !paused; say(paused ? 'Paused' : 'Resumed'); }
   else if (k === 'd' && !driveBy.active) startDriveBy();
+  else if (k === 'v') { const v = Object.keys(VIEWS); setView(v[(v.indexOf(S.view) + 1) % v.length]); }
   else if (k === 'w' && !driveBy.active) startDriveBy(PW.REMINDERS.water);
   else if (k === 'escape') openSettings(false);
 });
@@ -441,6 +558,9 @@ function syncForm() {
   $('s-rw').checked = R.water; $('s-rwm').value = R.waterMins; $('s-rs').checked = R.stretch; $('s-rsm').value = R.stretchMins;
   $('s-re').checked = R.eyes; $('s-rem').value = R.eyesMins; $('s-rc').value = R.custom || ''; $('s-rcm').value = R.customMins;
   $('s-weekend').checked = S.weekendSync; $('s-style').value = S.mapStyle; $('s-zoom').value = S.mapZoom;
+  $('s-format').value = S.format; $('s-view').value = S.view; $('s-loc').value = S.locator;
+  $('s-cam').innerHTML = '<option value="-1">Race leader</option>' + drivers().map((d, i) => `<option value="${i}">#${d.num} ${PW.esc(d.name)}</option>`).join('');
+  $('s-cam').value = S.camCar; renderCupInfo(); renderCareer();
   fillTeams(); fillDrivers(); fillDriveCar(); fillPlayers(); renderSeason();
 }
 const bind = (id, fn, ev = 'change') => $(id).addEventListener(ev, e => { fn(e.target); save(); });
@@ -456,6 +576,15 @@ bind('s-fav', el => { S.favTeam = +el.value; });
 bind('s-dbspeed', el => { S.drivebySpeed = el.value; });
 bind('s-dbcar', el => { S.drivebyDriver = +el.value; });
 bind('s-weekend', el => { S.weekendSync = el.checked; nextDef = pickNext(C.def); });
+bind('s-format', el => { S.format = el.value; if (el.value !== 'elimination') S.cup = null; renderCupInfo(); });
+bind('s-view', el => setView(el.value));
+bind('s-cam', el => { S.camCar = +el.value; });
+bind('s-loc', el => { S.locator = el.value; drawLocator(); });
+function renderCupInfo() {
+  const c = S.cup, D = drivers();
+  $('s-cupinfo').textContent = S.format !== 'elimination' ? '' : !c ? 'Starts with the next race: the slowest quarter is knocked out each race until four drivers race the final.'
+    : `Round ${c.round} · ${c.alive.length} drivers left: ${c.alive.map(i => D[i].code).join(' ')}${c.champs.length ? ' · Past champions: ' + c.champs.map(x => x.name).join(', ') : ''}`;
+}
 bind('s-style', el => { S.mapStyle = el.value; layout(); });
 bind('s-zoom', el => { S.mapZoom = el.value; layout(); });
 $('s-addplayer').addEventListener('click', () => {
@@ -502,6 +631,7 @@ if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test
 syncForm();
 newRace(S.rotation === 'single' ? pickNext(null) : pickNext(null));
 setMode(S.mode);
+setView(S.view);
 document.fonts?.ready.then(() => layout());
 try { if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
 window.__pw = {

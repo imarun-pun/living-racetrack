@@ -19,6 +19,9 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 | **Season** | Every race scores points (25-18-15…, plus fastest lap). Standings carry over, so friends can race each other all season. |
 | **Drive-bys** | A full-size car with a driver's name and flag drives across the screen, slowing down mid-screen so you can read it. The desktop app does it above your taskbar while you work. |
 | **Send a drive-by** | Make a link or QR code for a birthday, congratulations, good luck or your own words. When someone opens it, your car drives across their screen with the message and confetti. Share it by email, text or any app. |
+| **Camera views** | TV map, a zoomed chase cam that follows your car through every corner, and an onboard driver's-eye view built from the real circuit shape, with the cars ahead, barriers, kerbs and a live steering-wheel display. Press `V`. |
+| **Career mode** | Start in the slowest car, earn development points, upgrade engine, aero and tyres, and sign for better teams at the end of each 8-race season. |
+| **Elimination Cup** | A knockout tournament: the slowest quarter is out after every race until four drivers race the final. |
 | **Crashes and recovery** | Crashed cars stay where they stopped until a recovery crane lifts them over the wall and drives off. The safety car leaves from the pit exit, leads the pack and peels back into the pit lane. |
 | **Podium celebration** | The top three climb the podium and spray champagne after every race. |
 | **Fantasy league** | Each friend backs two drivers; their season points decide who wins the league. |
@@ -80,7 +83,7 @@ The installers are not code-signed yet, so Windows SmartScreen and macOS Gatekee
 
 ### Keys
 
-`A` ambient · `N` next race · `C` customize · `F` full screen · `P` pause · `D` drive-by · `W` water reminder · `Esc` close panel
+`A` ambient · `N` next race · `C` customize · `F` full screen · `P` pause · `D` drive-by · `W` water reminder · `V` change view · `Esc` close panel
 
 ## Project layout
 
@@ -97,6 +100,7 @@ js/pitcam.js            pit-stop camera
 js/garage.js            garage break and the original car design
 js/driveby.js           drive-by car with name tag (web and desktop)
 js/celebrate.js         podium and champagne
+js/onboard.js           onboard (driver's-eye) camera
 js/share.js, send.html, go.html   send-a-drive-by links and QR codes
 js/calendar.js          real race-weekend dates
 js/world.js, locator.js world locator map

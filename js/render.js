@@ -38,6 +38,7 @@ PW.Renderer = class Renderer {
   layout(W, H, DPR, r, opts = {}) {
     const C = this.C, N = PW.N;
     this.style = opts.style || 'circuit';
+    this.ls = Math.min(DPR * (opts.hires ? 2.4 : 1), 8192 / Math.max(W, H));   // layer resolution; higher for the chase cam
     this.W = W; this.H = H; this.DPR = DPR;
     this.cv.width = Math.round(W * DPR); this.cv.height = Math.round(H * DPR);
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -63,8 +64,8 @@ PW.Renderer = class Renderer {
     return p;
   }
   drawStatic() {
-    this.layer.width = this.cv.width; this.layer.height = this.cv.height;
-    const g = this.layer.getContext('2d'); g.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
+    this.layer.width = Math.round(this.W * this.ls); this.layer.height = Math.round(this.H * this.ls);
+    const g = this.layer.getContext('2d'); g.setTransform(this.ls, 0, 0, this.ls, 0, 0);
     if (this.style === 'circuit') this.drawCircuit(g); else this.drawNeon(g);
   }
   /* Realistic circuit: grass, run-off, gravel traps, tyre walls, grandstands, pit garages, grid boxes. */
@@ -128,6 +129,11 @@ PW.Renderer = class Renderer {
     g.fillStyle = '#111317'; g.fillRect(-2, -w * .9, 4, w * 1.8); g.fillStyle = '#ff2b2b';
     for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(0, -w * .6 + k * w * .3, 1.4, 0, 6.29); g.fill(); }
     g.restore();
+  }
+  bounds() {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, m = this.w * 3;
+    for (let i = 0; i < PW.N; i += 8) { x0 = Math.min(x0, this.SX[i]); x1 = Math.max(x1, this.SX[i]); y0 = Math.min(y0, this.SY[i]); y1 = Math.max(y1, this.SY[i]); }
+    return { x0: x0 - m, y0: y0 - m, x1: x1 + m, y1: y1 + m };
   }
   segPx(a, b) { const [x1, y1] = this.at(a, 0), [x2, y2] = this.at(b, 0); return Math.hypot(x2 - x1, y2 - y1); }
   kerbs(g, c1, c2) {
@@ -232,8 +238,18 @@ PW.Renderer = class Renderer {
   }
   draw(race, now, dtR, view) {
     const ctx = this.ctx, C = this.C, w = this.w, W = this.W, H = this.H, L = C.L;
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.layer, 0, 0);
     ctx.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
+    const cam = view.cam && !view.cam.cleared ? view.cam : null;
+    if (cam) {
+      // chase cam: zoomed in, rotating with the car so it always points up the screen
+      ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, W, H);
+      const [cx, cy, ca] = this.at(cam.dist, cam.lat * w * .3);
+      const target = ca + Math.PI / 2; let da = target - (this.camA ?? target); da = Math.atan2(Math.sin(da), Math.cos(da));
+      this.camA = (this.camA ?? target) + da * Math.min(1, (dtR || .016) * 3);
+      const Z = Math.max(2.2, Math.min(5, 38 / w * 1.3));
+      ctx.save(); ctx.translate(W / 2, H * .62); ctx.rotate(-this.camA); ctx.scale(Z, Z); ctx.translate(-cx, -cy);
+    }
+    ctx.drawImage(this.layer, 0, 0, W, H);
     const rain = race.weather.rain;
     if (rain > .02) { ctx.save(); ctx.strokeStyle = '#8fc7ff'; ctx.globalAlpha = .12 * rain; ctx.lineWidth = w * .7; ctx.lineJoin = 'round'; ctx.stroke(this.path); ctx.restore(); }
     if (race.sc) { ctx.save(); ctx.strokeStyle = '#ffc21a'; ctx.globalAlpha = .18 + .1 * Math.sin(now / 300); ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.stroke(this.path); ctx.restore(); }
@@ -246,7 +262,7 @@ PW.Renderer = class Renderer {
       const [x, y, a] = this.at(d.s, d.lat * w * .3);
       ctx.save(); ctx.translate(x, y); ctx.rotate(a + d.a); ctx.fillStyle = d.c; ctx.fillRect(-d.r, -d.r * .4, d.r * 2, d.r * .8); ctx.restore();
     }
-    const latPx = w * .3, len = Math.max(10, w * 1.05), wid = Math.max(4.5, w * .42), detail = w >= 12;
+    const latPx = w * .3, len = Math.max(10, w * 1.05), wid = Math.max(4.5, w * .42), detail = w >= 12 || !!cam;
     const order = race.order.slice().reverse();
     // trails
     if (!this.reduce) for (const c of order) {
@@ -316,6 +332,7 @@ PW.Renderer = class Renderer {
         ctx.fillStyle = '#eef2f8'; ctx.fillText(t, x + (fw ? (fw + 4) / 2 : 0) + 1, y + .5);
       });
     }
+    if (cam) ctx.restore();
     // rain
     if (rain > .02) {
       ctx.fillStyle = `rgba(6,12,24,${.28 * rain})`; ctx.fillRect(0, 0, W, H);

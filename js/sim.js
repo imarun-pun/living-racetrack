@@ -20,19 +20,23 @@ PW.Race = class Race {
             : kind === 'shower' && Math.random() < .5 ? Math.floor(rnd(.7, .9) * this.laps) : Infinity };
     this.scAt = Math.random() < .3 ? (Math.floor(rnd(3, Math.max(4, this.laps - 3))) + Math.random()) * C.L : Infinity;
     const teams = opt.teams;
-    const order = teams.map((t, i) => i).sort(() => Math.random() - .5), teamPace = [];
-    order.forEach((t, r) => teamPace[t] = 1 - r * .003 - Math.random() * .0025);
-    this.cars = opt.drivers.map((d, i) => {
+    // team order: random each race, or the career's fixed pecking order (best team first)
+    const order = opt.teamOrder || teams.map((t, i) => i).sort(() => Math.random() - .5), teamPace = [];
+    order.forEach((t, r) => teamPace[t] = 1 - r * .003 - Math.random() * (opt.teamOrder ? .001 : .0025));
+    const entrants = Array.isArray(opt.entrants) && opt.entrants.length >= 2 ? opt.entrants : opt.drivers.map((d, i) => i);
+    this.cars = entrants.map(i => {
+      const d = opt.drivers[i];
       const code = d.code, team = Math.floor(i / 2), start = this.weather.rain > .4 ? 'I' : (Math.random() < .5 ? 'S' : 'M');
-      const pace = teamPace[team] + rnd(-.0015, .0015);
+      const pace = teamPace[team] + rnd(-.0015, .0015) + (opt.bonus && opt.bonus[i] || 0);
       return { i, code, name: d.name, flag: d.flag, num: d.num, team, color: teams[team].color, color2: teams[team].color2, pace, quali: pace + rnd(-.004, .004),
         dist: 0, v: 0, lat: 0, latT: 0, gridLat: 0, yaw: 0, tyre: start, tyreLaps: 0,
         pitLap: Math.max(2, Math.round(this.laps * (start === 'S' ? rnd(.33, .48) : rnd(.48, .64)))), planDone: false,
         pitNext: false, inPit: false, stopped: false, stopT: 0, stopDur: 0,
         noise: 0, cp: -1, cpT: 0, lapStart: 0, best: Infinity, finished: false, out: false,
-        passT: null, passCd: 0, react: rnd(.15, .45), lastPos: i, spin: null, crash: null, puncture: false };
+        passT: null, passCd: 0, react: rnd(.15, .45), lastPos: 0, spin: null, crash: null, puncture: false };
     });
-    this.grid([...this.cars].sort((a, b) => b.quali - a.quali), 0);
+    const quali = [...this.cars].sort((a, b) => b.quali - a.quali);
+    this.grid(opt.format === 'reverse' ? quali.reverse() : quali, 0);
     this.order = [...this.cars].sort((a, b) => a.lastPos - b.lastPos);
   }
   on(fn) { this.listeners.push(fn); }
