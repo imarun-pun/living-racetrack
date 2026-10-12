@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pit Wall</title>
+<meta name="description" content="Living Racetrack · Pit Wall: an always-on animated motorsport display for your wall.">
+<meta name="theme-color" content="#07090d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Saira:wght@400;500&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!--BODY-START-->
+<canvas id="track" aria-label="Animated racing circuit with cars"></canvas>
+<div class="hud">
+  <header class="session">
+    <div class="eyebrow">Round <b id="round">1</b> · <span id="kind">Simulated race</span></div>
+    <h1 id="cname">Circuit</h1>
+    <div class="meta"><div class="lap" id="lap">LAP 0 <span>/ 12</span></div><div class="pill grid" id="flag">Grid</div><div class="pill wx" id="wx" hidden>Rain</div></div>
+  </header>
+  <aside class="tower" id="tower" aria-label="Live timing">
+    <div class="tower-head"><span>POS · DRIVER</span><span>GAP</span></div>
+    <div class="rows" id="rows"></div>
+  </aside>
+  <div class="clock" id="clock">--:--<small id="date"></small></div>
+  <div class="lights" id="lights" hidden>
+    <div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div>
+  </div>
+  <div class="ticker" id="ticker" aria-live="polite"></div>
+  <section class="pitcam" id="pitcam" hidden aria-label="Pit stop camera">
+    <header><span>● Pit cam</span><span data-title></span></header>
+    <canvas></canvas>
+  </section>
+  <section class="amb" id="amb">
+    <div class="place" id="aplace">Place</div>
+    <h2 id="aname">Circuit</h2>
+    <dl class="stats">
+      <div><dt>Length</dt><dd id="alen">–</dd></div>
+      <div><dt>Corners</dt><dd id="acorn">–</dd></div>
+      <div><dt>Laps</dt><dd id="alaps">–</dd></div>
+      <div><dt>Leader</dt><dd id="alead">–</dd></div>
+    </dl>
+  </section>
+  <div class="banner" id="banner" hidden></div>
+  <div class="podium" id="podium" hidden>
+    <div class="pod-card">
+      <div class="chq"></div>
+      <div class="pod-body">
+        <div class="eyebrow" id="ptitle">Chequered flag</div>
+        <div class="winner"><div class="bar" id="pbar"></div><div><div class="code" id="pcode">—</div><div class="team" id="pteam"></div></div></div>
+        <div class="places" id="places"></div>
+        <div class="next" id="pnext"></div>
+      </div>
+    </div>
+  </div>
+  <section class="garage" id="garage" hidden aria-label="Garage break">
+    <canvas></canvas>
+    <div class="g-top"><div class="eyebrow">Garage break · <span data-why></span></div><div class="eyebrow" data-next></div></div>
+    <div class="g-info">
+      <div><div class="eyebrow">Team</div><h2 data-team>Team</h2><div class="drivers" data-drivers></div></div>
+      <dl class="specs" data-specs></dl>
+      <p class="fact"><b>DID YOU KNOW</b><span data-fact></span></p>
+    </div>
+  </section>
+  <div class="fader" id="fader"></div>
+  <nav class="controls" aria-label="Display controls">
+    <button id="bmode" type="button">Ambient</button>
+    <button id="bnext" type="button">Next race</button>
+    <button id="bset" type="button">Customize</button>
+    <button id="bfull" type="button">Full screen</button>
+  </nav>
+  <aside class="settings" id="settings" hidden aria-label="Customize">
+    <header><h2>Customize</h2><button id="sclose" type="button">Close</button></header>
+    <fieldset>
+      <legend>Tracks</legend>
+      <label class="field">Play <select id="s-rotation">
+        <option value="all">Every track in turn</option>
+        <option value="original">Original circuits only</option>
+        <option value="real">Real-layout replicas only</option>
+        <option value="custom">My imported tracks</option>
+        <option value="single">One track on repeat</option>
+      </select></label>
+      <label class="field">Track <select id="s-single"></select></label>
+      <div class="row-btns">
+        <label class="btn">Import track file<input type="file" id="s-import" accept=".geojson,.json,application/json"></label>
+        <button type="button" id="s-clear">Remove imported</button>
+      </div>
+      <p class="hint" id="s-imsg">Import a GeoJSON line (from OpenStreetMap or geojson.io) or a JSON list of [x, y] points in metres.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Race</legend>
+      <label class="field">Race length <select id="s-laps"><option value="6">Sprint · 6 laps</option><option value="12">Standard · 12 laps</option><option value="20">Long · 20 laps</option></select></label>
+      <label class="field">Pace <select id="s-pace"><option value="16">Fast · 16 s laps</option><option value="24">Normal · 24 s laps</option><option value="40">Relaxed · 40 s laps</option></select></label>
+      <label class="field">Weather <select id="s-weather"><option value="auto">Surprise me</option><option value="dry">Always dry</option><option value="wet">Always wet</option></select></label>
+      <label class="field check"><input type="checkbox" id="s-incidents"> Spins, crashes, safety cars and red flags</label>
+      <label class="field check"><input type="checkbox" id="s-pitcam"> Pit cam during stops</label>
+      <label class="field check"><input type="checkbox" id="s-garage"> Garage break between races</label>
+    </fieldset>
+    <fieldset>
+      <legend>Teams</legend>
+      <label class="field">Favourite team <select id="s-fav"></select></label>
+      <div class="teams" id="s-teams"></div>
+      <p class="hint">Main colour, second colour and name. Changes apply straight away.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Room</legend>
+      <label class="field check"><input type="checkbox" id="s-dim"> Dim the display at night</label>
+      <label class="field">Dim between <span style="display:flex;gap:6px;align-items:center"><input type="number" id="s-from" min="0" max="23"> and <input type="number" id="s-to" min="0" max="23"></span></label>
+      <p class="hint">Keys: <kbd>A</kbd> ambient · <kbd>N</kbd> next race · <kbd>C</kbd> customize · <kbd>F</kbd> full screen · <kbd>P</kbd> pause</p>
+      <button type="button" id="s-reset">Reset everything</button>
+    </fieldset>
+    <p class="hint">Teams, drivers and the four original circuits are fictional. Real layouts are traced from open map data and named by location. Not affiliated with any racing series.</p>
+  </aside>
+</div>
+<!--BODY-END-->
+<script src="js/data.js"></script>
+<script src="js/tracks-real.js"></script>
+<script src="js/circuit.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/render.js"></script>
+<script src="js/pitcam.js"></script>
+<script src="js/garage.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
