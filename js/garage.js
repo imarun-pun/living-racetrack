@@ -107,7 +107,8 @@ PW.Garage = class Garage {
     if (this.off.width !== ow || this.off.height !== oh) { this.off.width = ow; this.off.height = oh; }
     const o = this.off.getContext('2d'); o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, ow, oh);
     o.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);
-    PW.drawCarSide(o, this.info.team.color, this.info.team.color2, this.info.num, this.info.team.name, this.info.tyreC, spin);
+    if (PW.drawRaceCar) { o.translate(0, 16); PW.drawRaceCar(o, { c1: this.info.team.color, c2: this.info.team.color2, num: this.info.num, team: this.info.team.name, tyre: this.info.tyreC, spin, brake: arrive > .6 && arrive < .99 }); }
+    else PW.drawCarSide(o, this.info.team.color, this.info.team.color2, this.info.num, this.info.team.name, this.info.tyreC, spin);
     o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-atop';
     const hl = o.createLinearGradient(0, oh * .2, 0, oh * .85); hl.addColorStop(0, 'rgba(255,255,255,.16)'); hl.addColorStop(.45, 'rgba(255,255,255,0)'); hl.addColorStop(1, 'rgba(0,0,0,.3)');
     o.fillStyle = hl; o.fillRect(0, 0, ow, oh);
