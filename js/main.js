@@ -14,6 +14,10 @@ function load() {
     t.pts.every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))).map(t => ({ ...t, kind: 'custom', name: String(t.name || 'Custom track').replace(/[<>]/g, '').slice(0, 40), hue: '#ff6fb1', length: +t.length || undefined })) : [];
   if (!['race', 'ambient', 'art'].includes(s.mode)) s.mode = 'race';
   if (!['clock', 'day', 'night'].includes(s.light)) s.light = 'clock';
+  s.telemetry = s.telemetry === true;
+  s.world = s.world === true;
+  s.picks = s.picks && typeof s.picks === 'object' ? Object.fromEntries(Object.entries(s.picks).slice(-30).filter(([k, v]) => /^[\w-]{1,40}$/.test(k) && Number.isInteger(v) && v >= 0 && v < 20)) : {};
+  s.pundit = { calls: Math.max(0, +(s.pundit && s.pundit.calls) || 0), right: Math.max(0, +(s.pundit && s.pundit.right) || 0) };
   s.players = Array.isArray(s.players) ? s.players.slice(0, 8).map(p => ({ name: String((p && p.name) || 'Player').replace(/[<>\u0000-\u001f]/g, '').slice(0, 16), a: Math.max(0, Math.min(19, +(p && p.a) || 0)), b: Math.max(0, Math.min(19, +(p && p.b) || 0)) })) : [];
   if (!['circuit', 'neon'].includes(s.mapStyle)) s.mapStyle = 'circuit';
   if (!['close', 'normal', 'wide'].includes(s.mapZoom)) s.mapZoom = 'normal';
@@ -44,8 +48,10 @@ if (CAP) {
   if (CAP.get('garage') === '0') S.garage = false;
 }
 const save = () => { if (CAP) return; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
-const teams = () => PW.resolveTeams(S);
-const drivers = () => PW.resolveDrivers(S);
+const teams = () => SYNC ? SYNC.T : PW.resolveTeams(S);
+const drivers = () => SYNC ? SYNC.D : PW.resolveDrivers(S);
+/* A synced race (World Race or a Race Room) when not null: { spec, T, D } */
+let SYNC = null;
 const allTracks = () => [...PW.ORIGINAL_CIRCUITS, ...(PW.REAL_CIRCUITS || []), ...S.custom];
 function playlist() {
   const all = allTracks();
@@ -67,6 +73,8 @@ const garage = new PW.Garage($('garage'));
 const driveBy = new PW.DriveBy($('driveby'));
 const celebration = new PW.Celebration($('celebrate'));
 const onboard = new PW.Onboard($('onboard'));
+const telemetry = new PW.Telemetry($('telemetry'));
+const telemOn = () => S.telemetry && S.mode === 'race' && innerWidth >= 1100;
 const VIEWS = { map: 'TV map', chase: 'Chase cam', onboard: 'Onboard' };
 const MODES = { race: 'Race view', ambient: 'Ambient', art: 'Live Art' };
 /* Wall display lock: the desktop app's display mode, or #display in the address for a kiosk browser.
@@ -79,7 +87,7 @@ const ART_SHOTS = [['map', 48], ['chase', 20], ['map', 40], ['onboard', 16]];
 const curView = () => S.mode === 'art' ? art.view : S.view;
 /* The car the cameras follow: your chosen driver, or the leader if that car is out or not in this race. */
 function camCar() {
-  const want = S.mode === 'art' ? art.car : S.camCar;
+  const want = SYNC && syncMe >= 0 && S.mode !== 'art' ? syncMe : S.mode === 'art' ? art.car : S.camCar;
   const c = want >= 0 ? race.cars.find(x => x.i === want) : null;
   return c && !c.cleared ? c : race.running()[0] || race.cars[0];
 }
@@ -88,12 +96,15 @@ let C, race, TS = 3, phase = 'race', phaseT = 0, round = 1, lightsT = 0, hold = 
 const pairT = {};
 let msgs = [], bannerT = 0, firstStart = true, pendT = 0, garageInfo = null, radioT = 0;
 
-function newRace(def) {
+function newRace(def, spec) {
+  if (spec) { def = spec.track; const sd = PW.syncDrivers(spec); SYNC = { spec, T: sd.teams, D: sd.drivers, key: spec.kind === 'world' ? 'w' + spec.n : 'r' + spec.seed.toString(36) }; }
+  else SYNC = null;
   C = PW.buildCircuit(def); renderer.setCircuit(C);
-  TS = C.T / S.lapSeconds;
-  if (S.format === 'elimination' && !S.cup) S.cup = { alive: drivers().map((d, i) => i), round: 1, champs: [] };
-  const K = S.career;
-  race = new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams(), drivers: drivers(), format: S.format,
+  TS = C.T / (spec ? spec.lapSeconds : S.lapSeconds);
+  if (!spec && S.format === 'elimination' && !S.cup) S.cup = { alive: drivers().map((d, i) => i), round: 1, champs: [] };
+  const K = spec ? { on: false } : S.career;
+  race = spec ? new PW.Race(C, { laps: spec.laps, incidents: true, weather: 'auto', teams: teams(), drivers: drivers(), format: 'standard', seed: spec.seed, auto: true, timeScale: TS })
+    : new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams(), drivers: drivers(), format: S.format,
     entrants: S.format === 'elimination' ? S.cup.alive : null,
     teamOrder: K.on ? K.order : null, bonus: K.on ? { [K.slot]: (K.up.engine + K.up.aero + K.up.tyres) * .0013 } : null });
   race.on(onEvent);
@@ -102,12 +113,13 @@ function newRace(def) {
   document.documentElement.style.setProperty('--accent', def.hue || '#38c6ff');
   const wk = PW.weekendNow && PW.weekendNow();
   const kind = wk && def.id === wk.track ? 'Real race weekend · ' + PW.weekendLabel(wk) : def.kind === 'real' ? 'Real-layout replica' : def.kind === 'custom' ? 'Imported track' : 'Original circuit';
-  const fmt = S.format === 'elimination' ? ` · Elimination Cup ${S.cup.alive.length <= 4 ? 'final' : 'round ' + S.cup.round} · ${S.cup.alive.length} drivers` : S.format === 'reverse' ? ' · Reverse grid' : '';
+  const fmt = spec ? '' : S.format === 'elimination' ? ` · Elimination Cup ${S.cup.alive.length <= 4 ? 'final' : 'round ' + S.cup.round} · ${S.cup.alive.length} drivers` : S.format === 'reverse' ? ' · Reverse grid' : '';
   const car = K.on ? ` · Career S${K.season} race ${K.race + 1}/${K.per}` : '';
-  $('round').textContent = round; $('kind').textContent = kind + fmt + car + ' · Simulated race';
+  $('round').textContent = round; $('kind').textContent = spec ? (spec.kind === 'world' ? 'World Race · live on every Lapwall' : 'Race Room · ' + spec.title) + ' · Simulated race' : kind + fmt + car + ' · Simulated race';
   $('cname').textContent = def.name; $('aname').textContent = def.name; $('aplace').textContent = def.place || kind;
-  $('alen').textContent = (C.L / 1000).toFixed(3) + ' km'; $('acorn').textContent = C.corners.length; $('alaps').textContent = S.laps;
-  nextDef = pickNext(def);
+  $('alen').textContent = (C.L / 1000).toFixed(3) + ' km'; $('acorn').textContent = C.corners.length; $('alaps').textContent = race.laps;
+  nextDef = spec ? def : pickNext(def);
+  telemetry.reset(race); renderLobby(true); $('bnext').disabled = !!spec;
   msgs = []; renderTicker(); buildRows(); layout(); drawLocator(); artCaption();
   art.view = 'map'; art.shot = 0; art.t = 0; art.cut = null;
   const nx = PW.weekendNext && PW.weekendNext();
@@ -132,8 +144,9 @@ function onEvent(type, d) {
     case 'green': say('Green flag · racing resumes'); banner('Green flag', '', 'go', 1.4); break;
     case 'red': say('Red flag · the session is stopped', 'red'); banner('Red flag', 'Session stopped · cars return to the grid', 'red', 999); pitcam.clear(); break;
     case 'red-stopped':
-      fade = { t: 0, did: false, mid: () => { race.regrid(); hideBanner(); lightsT = 0; hold = rnd(.6, 2.2); } };
+      fade = { t: 0, did: false, mid: () => { if (!race.auto) race.regrid(); hideBanner(); lightsT = 0; hold = rnd(.6, 2.2); } };
       break;
+    case 'lights-out': units.forEach(u => u.classList.remove('on')); lightsOff = performance.now(); say(firstStart ? `Lights out · ${race.laps} laps at ${C.def.name}` : 'Lights out · racing resumes', 'red'); firstStart = false; break;
     case 'regrid': say(`Standing restart from the grid · lap ${d.lap} · fresh tyres for everyone`, 'red'); break;
     case 'contact': say(`Contact! ${d.a.code} and ${d.b.code} touch · ${d.victim.code} has a puncture`, 'sc', d.victim.team === S.favTeam); break;
     case 'fastest': say(`Fastest lap · ${c.code} ${PW.fmtLap(d.t)}`, 'fl', fav); break;
@@ -272,7 +285,7 @@ function showPodium() {
   phase = 'podium'; phaseT = 0; pitcam.clear(); hideBanner();
   const [p1, p2, p3] = race.finishOrder, T = teams();
   if (!p1) { phaseT = 12; return; }
-  awardPoints();
+  if (SYNC) judgePick(); else awardPoints();
   $('pcode').textContent = p1.code;
   $('pteam').innerHTML = `<span class="name">${flagImg(p1.flag)}${PW.esc(p1.name)}</span>${PW.esc(T[p1.team].name)} · #${p1.num} · Winner`;
   $('pbar').style.background = p1.color; $('ptitle').textContent = `Chequered flag · ${C.def.name}`;
@@ -281,10 +294,10 @@ function showPodium() {
     (fl ? `<div class="flrow"><span class="p">FL</span><span class="bar" style="background:${fl.color}"></span>${flagImg(fl.flag)}<span>${PW.esc(PW.shortName(fl.name))}</span><span class="v">${PW.fmtLap(race.fl.t)}</span></div>` : '') +
     (race.cars.some(c => c.out) ? `<div><span class="p">DNF</span><span class="bar" style="background:var(--red)"></span><span></span><span>${race.cars.filter(c => c.out).map(c => c.code).join(' ')}</span><span class="v"></span></div>` : '');
   const lead = standings(1)[0];
-  $('pnext').dataset.season = lead ? `Championship leader: ${PW.shortName(lead.name)} · ${lead.pts} pts` : '';
+  $('pnext').dataset.season = SYNC ? (SYNC.spec.kind === 'world' ? SYNC.spec.title : SYNC.spec.title + ' · Race Room') : lead ? `Championship leader: ${PW.shortName(lead.name)} · ${lead.pts} pts` : '';
   $('podium').hidden = false;
   celebration.start(race.finishOrder.slice(0, 3).map(c => ({ name: c.name, code: c.code, flag: c.flag, color: c.color, color2: c.color2 })));
-  const lg = league(); $('pnext').dataset.season += lg.length ? ` · League: ${lg.slice(0, 2).map(p => `${p.name} ${p.pts}`).join(', ')}` : '';
+  const lg = SYNC ? [] : league(); $('pnext').dataset.season += lg.length ? ` · League: ${lg.slice(0, 2).map(p => `${p.name} ${p.pts}`).join(', ')}` : '';
   const useFav = S.favTeam >= 0 && round % 2 === 0;
   const ti = useFav ? S.favTeam : p1.team, slotCar = i => race.cars.find(c => c.i === i) || { num: drivers()[i].num, name: drivers()[i].name }, a = slotCar(ti * 2), b = slotCar(ti * 2 + 1);
   garageInfo = { team: T[ti], num: ti === p1.team ? p1.num : a.num, drivers: [a, b].map(c => `#${c.num} ${c.name}`),
@@ -356,12 +369,12 @@ function lightAt(d) {
   const golden = Math.max(Math.exp(-Math.pow((h - 18.3) / .9, 2)), Math.exp(-Math.pow((h - 6.8) / .9, 2)));
   return { night, golden: golden * (1 - night * .7) };
 }
-function applyLight(d) { if (renderer.C) renderer.setLight(lightAt(d || new Date())); }
+function applyLight(d) { const l = lightAt(d || new Date()); onboard.light = l; if (renderer.C) renderer.setLight(l); }
 
 // ---------- Layout ----------
 function drawLocator() {
   const d = C && C.def, el = $('locator');
-  el.hidden = !(d && typeof d.lat === 'number') || S.locator === 'off' || curView() !== 'map' || S.mode === 'art';
+  el.hidden = !(d && typeof d.lat === 'number') || S.locator === 'off' || curView() !== 'map' || S.mode === 'art' || telemOn();
   if (el.hidden) return;
   PW.drawLocator(el.querySelector('canvas'), d.lat, d.lon, d.hue || '#38c6ff');
   $('loccap').textContent = PW.fmtCoord(d.lat, d.lon);
@@ -378,13 +391,13 @@ function layout() {
   if (S.mode === 'art') r = { x: W * .04, y: H * .06, w: W * .92, h: H * .88 };
   else if (S.mode === 'ambient') r = narrow ? { x: 16, y: H * .16, w: W - 32, h: H * .5 } : { x: W * .05, y: H * .1, w: W * .9, h: H * .62 };
   else if (narrow) r = { x: 16, y: 150, w: W - 32, h: Math.max(140, H - 150 - (5 * row + 120)) };
-  else r = { x: 290, y: 104, w: W - 290 - 36, h: H - 104 - 120 };
+  else r = { x: 290, y: 104, w: W - 290 - 36 - (telemOn() ? 340 : 0), h: H - 104 - 120 };
   renderer.layout(W, H, DPR, r, { style: S.mapStyle, zoom: S.mapZoom, hires: curView() === 'chase' || S.mode === 'art' });
   applyLight();
 }
 
 // ---------- Loop ----------
-let last = performance.now(), hudT = 0, clockT = 0;
+let last = performance.now(), hudT = 0, clockT = 0, telT = 0;
 const lightsEl = $('lights'), units = [...lightsEl.querySelectorAll('.unit')];
 function frame(now) {
   const dtR = Math.min(.05, (now - last) / 1000); last = now;
@@ -394,7 +407,8 @@ function frame(now) {
       if (fade.t > .9 && !fade.did) { fade.did = true; fade.mid(); }
       if (fade.t > 2.4) fade = null;
     }
-    if (phase !== 'garage') {
+    if (SYNC && phase !== 'garage') syncStep(now);
+    else if (phase !== 'garage') {
       if (race.state === 'grid') {
         if (!fade) {
           lightsT += dtR; lightsEl.hidden = false;
@@ -408,17 +422,18 @@ function frame(now) {
       } else {
         if (lightsOff && now - lightsOff > 1400) { lightsEl.hidden = true; lightsOff = 0; }
         let sim = dtR * TS; while (sim > 0) { const d = Math.min(.05, sim); race.step(d); sim -= d; }
+        telemetry.update(race, dtR * TS);
       }
     }
     if (phase === 'podium') {
-      phaseT += dtR; $('pnext').textContent = `${$('pnext').dataset.season ? $('pnext').dataset.season + ' · ' : ''}Next: ${nextDef.name} in ${Math.max(0, Math.ceil(12 - phaseT))}s`;
+      phaseT += dtR; $('pnext').textContent = `${$('pnext').dataset.season ? $('pnext').dataset.season + ' · ' : ''}` + (SYNC ? (SYNC.spec.kind === 'world' ? 'Next World Race at ' + new Date(SYNC.spec.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Race over') : `Next: ${nextDef.name} in ${Math.max(0, Math.ceil(12 - phaseT))}s`);
       if (phaseT > 12) {
         $('podium').hidden = true; celebration.stop();
-        if (S.garage && garageInfo) { phase = 'garage'; phaseT = 0; garage.show(garageInfo); } else { round++; newRace(nextDef); }
+        if (S.garage && garageInfo) { phase = 'garage'; phaseT = 0; garage.show(garageInfo); } else afterRace();
       }
     } else if (phase === 'garage') {
       phaseT += dtR; garage.update(dtR, 20 - phaseT, nextDef.name);
-      if (phaseT > 20) { round++; newRace(nextDef); }
+      if (phaseT > 20) afterRace();
     }
     if (phase === 'podium') celebration.update(dtR);
     pitcam.update(dtR);
@@ -433,7 +448,9 @@ function frame(now) {
   const view = curView(), onb = view === 'onboard' && phase !== 'garage';
   $('onboard').hidden = !onb;
   const drift = S.mode === 'art' && view === 'map' ? { k: 1.03 + .03 * Math.sin(now / 47000), x: Math.sin(now / 61000) * innerWidth * .012, y: Math.cos(now / 53000) * innerHeight * .012 } : null;
-  if (phase !== 'garage' && !onb) renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race' && view === 'map', fav: S.mode === 'art' ? -2 : S.favTeam, cam: view === 'chase' ? camCar() : null, drift });
+  if (phase !== 'garage' && !onb) renderer.draw(race, now, paused ? 0 : dtR, { labels: S.mode === 'race' && view === 'map', fav: S.mode === 'art' ? -2 : SYNC ? (syncMe >= 0 ? Math.floor(syncMe / 2) : -2) : S.favTeam, cam: view === 'chase' ? camCar() : null, drift, dominance: telemOn() ? telemetry.dominance() : null });
+  const tOn = telemOn(); $('telem').hidden = !tOn;
+  if (tOn && now - telT > 66) { telemetry.draw(race, camCar()); telT = now; }
   if (onb) onboard.draw(race, camCar(), now, paused ? 0 : dtR);
   if (!driveBy.active && phase !== 'garage' && !paused) checkReminders(now);
   if (S.driveby && S.mode === 'ambient' && phase === 'race' && !driveBy.active && now > nextDrive) startDriveBy();
@@ -446,6 +463,76 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 let lightsOff = 0;
+
+// ---------- World Race and Race Rooms (synced, no server) ----------
+let syncMe = -1, roomOver = false, lobbyT = 0;
+function syncStep(now) {
+  const sp = SYNC.spec, wait = sp.start - Date.now();
+  if (wait > 0) { lightsEl.hidden = true; lobbyTick(now, wait); return; }
+  const target = -wait / 1000 * TS, far = target - race.t > 60;
+  let n = 0;
+  while (race.t + .05 <= target && n < 300000) { race.step(.05); if (!far || target - race.t < 40) telemetry.update(race, .05); n++; }
+  if (race.state === 'grid') { lightsEl.hidden = false; const on = race.lightsOn(); units.forEach((u, k) => u.classList.toggle('on', k < on)); }
+  else if (lightsOff && now - lightsOff > 1400) { lightsEl.hidden = true; lightsOff = 0; }
+  lobbyTick(now, 0);
+}
+function afterRace() {
+  round++;
+  if (SYNC && SYNC.spec.kind === 'world') { newRace(null, PW.worldSlot(Math.max(Date.now(), SYNC.spec.end + 1000))); return; }
+  if (SYNC && SYNC.spec.kind === 'room') { phase = 'race'; roomOver = true; renderLobby(true); return; }
+  newRace(nextDef);
+}
+function judgePick() {
+  const pick = S.picks[SYNC.key], win = race.finishOrder[0];
+  if (pick === undefined || !win || SYNC.judged) return;
+  SYNC.judged = true; S.pundit.calls++; if (win.i === pick) S.pundit.right++; save();
+  say(win.i === pick ? `You called it: ${win.code} wins! Pundit score ${S.pundit.right}/${S.pundit.calls}` : `Your pick ${drivers()[pick].code} didn't win this time · Pundit score ${S.pundit.right}/${S.pundit.calls}`, 'fl', true, 'PICK');
+}
+const fmtWait = ms => { const s = Math.ceil(ms / 1000); if (s >= 3600) return `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min`; return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+/* The lobby card: countdown before the start, who you are, your pick, invite link; the result when a room is over. */
+function renderLobby(force) {
+  const el = $('lobby'), pill = $('syncpill');
+  if (!SYNC) { el.hidden = true; pill.hidden = true; return; }
+  const sp = SYNC.spec, D = drivers(), opts = D.map((d, i) => `<option value="${i}">#${d.num} ${PW.esc(d.name)}</option>`).join('');
+  if (force) {
+    $('lb-kind').textContent = sp.kind === 'world' ? 'World Race · every Lapwall, same race' : 'Race Room' + (sp.h ? ` · hosted by ${sp.h}` : '');
+    $('lb-title').textContent = sp.kind === 'world' ? `${sp.track.name} · ${sp.title}` : `${sp.title} · ${sp.track.name}`;
+    $('lb-me-wrap').hidden = sp.kind !== 'room';
+    $('lb-me').innerHTML = '<option value="-1">Just watching</option>' + D.map((d, i) => i < (sp.g || []).length ? `<option value="${i}">${PW.esc(d.name)}</option>` : '').join('');
+    $('lb-me').value = syncMe;
+    $('lb-pick').innerHTML = '<option value="">No pick</option>' + opts;
+    $('lb-pick').value = S.picks[SYNC.key] ?? '';
+    $('lb-copy').hidden = sp.kind !== 'room';
+    $('lb-rematch').hidden = !(sp.kind === 'room' && roomOver);
+    pill.textContent = sp.kind === 'world' ? `● World Race · live on every Lapwall` : `● Race Room · ${sp.title}`;
+  }
+  $('lb-score').textContent = S.pundit.calls ? `Pundit score: ${S.pundit.right} right out of ${S.pundit.calls} picks` : 'Pick a winner before the lights go out. Your pundit score builds over time.';
+}
+function lobbyTick(now, wait) {
+  if (now - lobbyT < 250) return; lobbyT = now;
+  const el = $('lobby'), started = wait <= 0 && race.state !== 'grid';
+  const show = wait > 0 || roomOver;
+  el.hidden = !show; $('syncpill').hidden = show || !SYNC || phase !== 'race';
+  $('lb-pick').disabled = started;
+  if (roomOver) { const w = race.finishOrder[0]; $('lb-count').textContent = w ? `${w.name} wins` : 'Race over'; $('lb-sub').textContent = 'Same friends again? Make a rematch and send the new link.'; }
+  else { $('lb-count').textContent = fmtWait(wait); $('lb-sub').textContent = SYNC.spec.kind === 'world' ? 'Every screen running Lapwall sees this exact race at the same moment. Nothing is sent anywhere: the race comes from the clock.' : 'Everyone with the link sees the same race at the same moment. Open it on the TV, the phone, anywhere.'; }
+}
+function enterSync(spec) { roomOver = false; syncMe = -1; round++; newRace(null, spec); renderLobby(true); }
+function leaveSync() {
+  S.world = false; save(); roomOver = false;
+  if (/room=|world/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
+  round++; newRace(pickNext(null)); renderLobby(true); $('bworld').setAttribute('aria-pressed', 'false');
+}
+$('lb-pick').addEventListener('change', e => { if (!SYNC) return; if (e.target.value === '') delete S.picks[SYNC.key]; else S.picks[SYNC.key] = +e.target.value; save(); });
+$('lb-me').addEventListener('change', e => { syncMe = +e.target.value; });
+$('lb-leave').addEventListener('click', leaveSync);
+$('lb-copy').addEventListener('click', () => { const link = PW.roomLink(SYNC.spec); (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => { $('lb-copy').textContent = 'Link copied'; setTimeout(() => { $('lb-copy').textContent = 'Copy invite link'; }, 1600); }).catch(() => prompt('Invite link', link)); });
+$('lb-rematch').addEventListener('click', () => {
+  const sp = SYNC.spec, r = PW.cleanRoom({ n: sp.n, h: sp.h, t: sp.t, l: sp.l, g: sp.g, d: (Math.random() * 4294967296) >>> 0, s: Math.ceil((Date.now() + 3 * 60000) / 60000) * 60000 });
+  history.replaceState(null, '', '#room=' + PW.encodeRoom(r)); enterSync(r);
+});
+$('bworld').addEventListener('click', () => { if (SYNC && SYNC.spec.kind === 'world') leaveSync(); else { S.world = true; save(); $('bworld').setAttribute('aria-pressed', 'true'); enterSync(PW.worldSlot()); } });
+addEventListener('hashchange', () => { const r = PW.decodeRoom(location.hash); if (r) enterSync(r); });
 
 // ---------- Live Art ----------
 /* Pick the closest fight in the top ten for the close-up shots. */
@@ -517,8 +604,9 @@ function setMode(m) {
   document.body.classList.toggle('onboard', curView() === 'onboard');
   layout(); drawLocator(); artCaption();
 }
+function setTelemetry(on) { S.telemetry = on; save(); $('btelem').setAttribute('aria-pressed', String(on)); layout(); drawLocator(); }
 const nextMode = () => { const k = Object.keys(MODES); return k[(k.indexOf(S.mode) + 1) % k.length]; };
-const nextRace = () => { round++; newRace(phase === 'race' && race.state !== 'done' ? pickNext(C.def) : nextDef); };
+const nextRace = () => { if (SYNC) return; round++; newRace(phase === 'race' && race.state !== 'done' ? pickNext(C.def) : nextDef); };
 async function fullscreen() {
   try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (e) {}
   try { await navigator.wakeLock?.request('screen'); } catch (e) {}
@@ -526,12 +614,15 @@ async function fullscreen() {
 const openSettings = open => { $('settings').hidden = !open; if (open) { document.body.classList.remove('idle'); $('sclose').focus(); } };
 $('bmode').addEventListener('click', () => setMode(nextMode()));
 $('bnext').addEventListener('click', nextRace);
+$('btelem').addEventListener('click', () => setTelemetry(!S.telemetry));
+$('btelem').setAttribute('aria-pressed', String(S.telemetry));
 $('bview').addEventListener('click', () => { const k = Object.keys(VIEWS); setView(k[(k.indexOf(S.view) + 1) % k.length]); });
 $('bfull').addEventListener('click', fullscreen);
 $('bset').addEventListener('click', () => openSettings($('settings').hidden));
 $('sclose').addEventListener('click', () => openSettings(false));
 addEventListener('keydown', e => {
   if (LOCK) { e.preventDefault(); return; }
+  if (SYNC && ['n', 'p'].includes(e.key.toLowerCase())) return;   // a synced race runs on everyone's clock
   if (e.target.closest && e.target.closest('input, select')) return;
   const k = e.key.toLowerCase();
   if (k === 'a') setMode(nextMode());
@@ -542,6 +633,7 @@ addEventListener('keydown', e => {
   else if (k === 'd' && !driveBy.active) startDriveBy();
   else if (k === 'v') { const v = Object.keys(VIEWS); setView(v[(v.indexOf(S.view) + 1) % v.length]); }
   else if (k === 'w' && !driveBy.active) startDriveBy(PW.REMINDERS.water);
+  else if (k === 't') setTelemetry(!S.telemetry);
   else if (k === 'escape') openSettings(false);
 });
 let idleT;
@@ -698,7 +790,7 @@ $('s-clear').addEventListener('click', () => {
 $('s-reset').addEventListener('click', () => { S = { ...structuredClone(PW.DEFAULT_SETTINGS), mode: S.mode }; save(); syncForm(); applyTeams(); round++; newRace(pickNext(null)); });
 
 // Send-a-Zoom-by opens next to this page on the web, or on the public site otherwise
-if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test(location.hostname)) $('bsend').href = PW.HOME + 'send.html';
+if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test(location.hostname)) { $('bsend').href = PW.HOME + 'send.html'; $('broom').href = PW.HOME + 'room.html'; }
 
 // ---------- Wall display lock ----------
 function setupLock() {
@@ -734,14 +826,21 @@ function setupLock() {
 // ---------- Boot ----------
 syncForm();
 if (LOCK) setupLock();
-newRace(pickNext(null));
+{
+  const room = PW.decodeRoom(location.hash);
+  if (room) newRace(null, room);
+  else if (S.world || /(^|[#&])world\b/.test(location.hash)) { S.world = true; newRace(null, PW.worldSlot()); }
+  else newRace(pickNext(null));
+  $('bworld').setAttribute('aria-pressed', String(!!(SYNC && SYNC.spec.kind === 'world')));
+  renderLobby(true);
+}
 setMode(LOCK ? 'art' : S.mode);
 setView(S.view);
 document.fonts?.ready.then(() => layout());
 try { if (!CAP && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
 window.__pw = {
-  get race() { return race; }, get C() { return C; }, get phase() { return phase; }, get round() { return round; },
-  ff(s) { while (s > 0) { if (race.state !== 'grid') race.step(.05); s -= .05; } renderHUD(); },
+  get race() { return race; }, get C() { return C; }, get phase() { return phase; }, get round() { return round; }, get telemetry() { return telemetry; },
+  ff(s) { while (s > 0) { if (race.state !== 'grid') { race.step(.05); telemetry.update(race, .05); } s -= .05; } renderHUD(); },
   start() { lightsT = 99; },
   crash(i = 0) { const c = race.running()[i]; race.startCrash(c, Math.floor(PW.mod(c.dist, C.L) / C.ds)); },
   spin(i = 0) { const c = race.running()[i]; race.startSpin(c, Math.floor(PW.mod(c.dist, C.L) / C.ds)); },

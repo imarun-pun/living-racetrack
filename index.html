@@ -71,6 +71,18 @@
       <p class="fact"><b>DID YOU KNOW</b><span data-fact></span></p>
     </div>
   </section>
+  <div class="syncpill" id="syncpill" hidden></div>
+  <section class="lobby" id="lobby" hidden aria-live="polite">
+    <div class="eyebrow" id="lb-kind">World Race</div>
+    <h2 id="lb-title">Circuit</h2>
+    <div class="lb-count" id="lb-count">–</div>
+    <p class="lb-sub" id="lb-sub"></p>
+    <label class="field" id="lb-me-wrap" hidden>I am <select id="lb-me"></select></label>
+    <label class="field">My pick to win <select id="lb-pick"></select></label>
+    <div class="row-btns"><button type="button" id="lb-copy" hidden>Copy invite link</button><button type="button" id="lb-rematch" hidden>Rematch in 3 minutes</button><button type="button" id="lb-leave">Leave</button></div>
+    <p class="hint" id="lb-score"></p>
+  </section>
+  <section class="telem" id="telem" hidden aria-label="Live telemetry"><canvas id="telemetry"></canvas></section>
   <div class="artfx" aria-hidden="true"></div>
   <div class="artcap" id="artcap" aria-live="polite"><b></b><span></span></div>
   <div class="wm" id="wm" hidden></div>
@@ -85,6 +97,9 @@
     <button id="bview" type="button">View: TV map</button>
     <button id="bmode" type="button">Mode: Race view</button>
     <button id="bnext" type="button">Next race</button>
+    <button id="btelem" type="button" aria-pressed="false">Telemetry</button>
+    <button id="bworld" type="button" aria-pressed="false">World Race</button>
+    <a class="btn" id="broom" href="room.html" target="_blank" rel="noopener">Race Room</a>
     <a class="btn" id="bsend" href="send.html" target="_blank" rel="noopener">Send a Zoom-by</a>
     <button id="bset" type="button">Customize</button>
     <button id="bfull" type="button">Full screen</button>
@@ -191,6 +206,8 @@
 <script src="js/locator.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/onboard.js"></script>
+<script src="js/telemetry.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/driveby.js"></script>
 <script src="js/main.js"></script>
 </body>

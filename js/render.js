@@ -60,6 +60,27 @@ PW.drawCarTop = function (g, len, wid, c1, c2, detail, noTyres) {
   poly([[-.5, -.33], [-.44, -.33], [-.44, .33], [-.5, .33]], carbon2);
   g.fillStyle = '#ff2b2b'; g.fillRect(X(-.5), Y(-.02), X(.012), Y(.04));                  // rain light
 };
+/* Corners for track furniture: every curvature peak (chicanes included), where each corner starts and ends,
+   which side is the outside, and whether it is fast. Shared by the map and the onboard camera. */
+const featCache = new WeakMap();
+PW.cornerFeatures = function (C) {
+  if (featCache.has(C)) return featCache.get(C);
+  const N = PW.N, K = C.K, ds = C.ds, R = Math.max(5, Math.round(30 / ds)), list = [];
+  for (let i = 0; i < N; i++) {
+    const k = Math.abs(K[i]); if (k < 1 / 240) continue;
+    let peak = true;
+    for (let d = 1; d <= R && peak; d++) { if (Math.abs(K[(i + d) % N]) > k || Math.abs(K[(i - d + N) % N]) >= k) peak = false; }
+    if (!peak) continue;
+    const sg = Math.sign(K[i]), lim = Math.round(150 / ds);
+    let b = 0, e = 0;
+    while (b < lim && Math.sign(K[(i - b - 1 + N) % N]) === sg && Math.abs(K[(i - b - 1 + N) % N]) > k * .3) b++;
+    while (e < lim && Math.sign(K[(i + e + 1) % N]) === sg && Math.abs(K[(i + e + 1) % N]) > k * .3) e++;
+    list.push({ apex: i * ds, s0: (i - b) * ds, s1: (i + e) * ds, side: -sg, fast: C.V[i] > 52 });
+  }
+  featCache.set(C, list); return list;
+};
+/* Street circuits are lined with walls instead of gravel traps. */
+PW.STREET_CIRCUITS = new Set(['mc-1929', 'sg-2008', 'az-2016', 'sa-2021', 'us-2023', 'marina-lights']);
 /* Cached high-resolution sprite per livery, so small cars stay crisp and detailed. */
 const spriteCache = new Map();
 PW.carSprite = function (c1, c2) {
@@ -98,7 +119,7 @@ PW.Renderer = class Renderer {
     const ox = r.x + (r.w - (maxX - minX) * S) / 2, oy = r.y + (r.h - (maxY - minY) * S) / 2;
     this.SX = new Float64Array(N); this.SY = new Float64Array(N);
     for (let i = 0; i < N; i++) { this.SX[i] = ox + (C.X[i] - minX) * S; this.SY[i] = oy + (C.Y[i] - minY) * S; }
-    this.w = Math.max(7, Math.min(22, Math.min(r.w, r.h) * .024, S * 14 * 1.4));
+    this.w = Math.max(8, Math.min(22, Math.min(r.w, r.h) * .024, S * 14 * 1.4));
     this.path = new Path2D(); this.path.moveTo(this.SX[0], this.SY[0]);
     for (let i = 1; i < N; i++) this.path.lineTo(this.SX[i], this.SY[i]); this.path.closePath();
     this.drawStatic();
@@ -140,15 +161,27 @@ PW.Renderer = class Renderer {
     g.save(); g.strokeStyle = hue; g.globalAlpha = .1; g.lineWidth = w * 4.2; g.shadowColor = hue; g.shadowBlur = 36; g.stroke(this.path); g.restore();
     // verge and run-off
     g.strokeStyle = '#2a2f37'; g.globalAlpha = .7; g.lineWidth = w * 1.9; g.stroke(this.path); g.globalAlpha = 1;
-    // gravel traps and tyre walls on the outside of corners
-    C.corners.forEach(ci => {
-      const s = ci * C.ds, side = -Math.sign(C.K[ci]);
-      g.save(); g.lineCap = 'round'; g.strokeStyle = '#bda87e'; g.lineWidth = w * 1.5;
-      g.stroke(this.offPath(s - 55, s + 45, side * w * 1.55, 4));
-      g.globalAlpha = .25; g.strokeStyle = '#8c7a55'; g.lineWidth = w * .5; g.stroke(this.offPath(s - 50, s + 40, side * w * 1.7, 4)); g.globalAlpha = 1;
-      g.lineCap = 'butt'; g.lineWidth = Math.max(2, w * .22); g.strokeStyle = '#e8eaee'; const wall = this.offPath(s - 60, s + 50, side * w * 2.45, 3); g.stroke(wall);
-      g.setLineDash([4, 4]); g.strokeStyle = '#d6332b'; g.stroke(wall); g.restore();
-    });
+    // street circuits: concrete walls close to the track all the way round, no gravel
+    const street = PW.STREET_CIRCUITS.has(C.def.id);
+    if (street) {
+      g.save(); g.lineJoin = 'round';
+      for (const side of [-1, 1]) { const p = this.offPath(0, L, side * w * .78, 4); g.strokeStyle = '#11141a'; g.lineWidth = Math.max(3, w * .26); g.stroke(p); g.strokeStyle = '#c9ced8'; g.lineWidth = Math.max(1.5, w * .12); g.stroke(p); }
+      g.restore();
+    }
+    // run-off on the outside of every corner: gravel for slow and medium corners, asphalt for fast ones,
+    // widest just after the apex where cars run wide, with a tyre wall along the far edge
+    for (const f of street ? [] : this.features()) {
+      const s0 = f.s0 - 12, s1 = f.s1 + 40, bell = s => { const u = (s - s0) / (s1 - s0); return Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(u, .8))), .7); };
+      const depth = s => w * (.32 + (f.fast ? .55 : .8) * bell(s)), area = this.ribbon(s0, s1, s => f.side * w * .5, s => f.side * (w * .5 + depth(s)));
+      g.save(); g.fillStyle = f.fast ? '#353a42' : this.gravel(g); g.fill(area);
+      if (f.fast) { g.clip(area); g.strokeStyle = 'rgba(214,51,43,.35)'; g.lineWidth = Math.max(1.5, w * .1); g.setLineDash([w * .5, w * .5]); g.stroke(this.offPath(s0, s1, f.side * w * .78, 3)); }
+      g.restore();
+      g.save(); g.lineCap = 'butt'; g.lineJoin = 'round';
+      const wall = this.offPathF(s0 - 6, s1 + 6, s => f.side * (w * .5 + depth(Math.max(s0, Math.min(s1, s))) + w * .12), 3);
+      g.strokeStyle = '#15181d'; g.lineWidth = Math.max(3, w * .3); g.stroke(wall);
+      g.strokeStyle = '#e8eaee'; g.lineWidth = Math.max(2, w * .18); g.stroke(wall);
+      g.setLineDash([Math.max(3, w * .25), Math.max(3, w * .25)]); g.strokeStyle = '#d6332b'; g.stroke(wall); g.restore();
+    }
     // grandstands along the main straight, outside
     const out = -inside;
     for (let k = 0; k < 3; k++) {
@@ -177,7 +210,7 @@ PW.Renderer = class Renderer {
     this.kerbs(g, '#f2f4f8', '#d6332b');
     // grid boxes
     for (let k = 0; k < 20; k++) {
-      const [x, y, a] = this.at(-10 - k * 8, (k % 2 ? 1.1 : -1.1) * w * .3);
+      const [x, y, a] = this.at(-10 - k * 8, (k % 2 ? 1.1 : -1.1) * w * .26);
       g.save(); g.translate(x, y); g.rotate(a); g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1;
       g.beginPath(); g.moveTo(w * .25, -w * .17); g.lineTo(w * .3, -w * .17); g.lineTo(w * .3, w * .17); g.lineTo(w * .25, w * .17); g.stroke(); g.restore();
     }
@@ -221,13 +254,46 @@ PW.Renderer = class Renderer {
     return { x0: x0 - m, y0: y0 - m, x1: x1 + m, y1: y1 + m };
   }
   segPx(a, b) { const [x1, y1] = this.at(a, 0), [x2, y2] = this.at(b, 0); return Math.hypot(x2 - x1, y2 - y1); }
+  /* Kerbs where real circuits have them: on the inside at the apex, and on the outside at corner entry and exit.
+     They sit on the track edge, painted in alternating blocks. */
   kerbs(g, c1, c2) {
-    const { C, w } = this;
-    C.corners.forEach(ci => {
-      const s = ci * C.ds, side = -Math.sign(C.K[ci]);
-      const p = this.offPath(s - 35, s + 35, side * (w / 2 + 2), 3);
-      g.save(); g.lineCap = 'butt'; g.lineWidth = 3.5; g.strokeStyle = c1; g.stroke(p); g.setLineDash([5, 5]); g.strokeStyle = c2; g.stroke(p); g.restore();
-    });
+    const w = this.w, kw = Math.max(2.4, w * .15), off = w * .5 - kw * .3;
+    g.save(); g.lineCap = 'butt'; g.lineJoin = 'round';
+    for (const f of this.features()) {
+      const span = f.s1 - f.s0, lk = Math.max(10, Math.min(38, span * .28));
+      const runs = [[f.apex - lk, f.apex + lk, -f.side], [f.s0 - 14, f.s0 + 12, f.side], [f.s1 - 16, f.s1 + 22, f.side]];
+      for (const [a, b, side] of runs) {
+        const p = this.offPath(a, b, side * off, 2);
+        g.setLineDash([]); g.lineWidth = kw; g.strokeStyle = c1; g.stroke(p);
+        g.setLineDash([kw * 1.1, kw * 1.1]); g.strokeStyle = c2; g.stroke(p);
+      }
+    }
+    g.restore();
+  }
+  /* Corners for track furniture: every curvature peak (chicanes included), with where the corner starts and ends. */
+  features() { return PW.cornerFeatures(this.C); }
+  /* A filled band beside the track between two offsets that may vary along it. */
+  ribbon(s0, s1, inner, outer, step = 3) {
+    const p = new Path2D(), pts = [];
+    for (let s = s0; s <= s1; s += step) pts.push(s);
+    pts.forEach((s, k) => { const [x, y] = this.at(s, inner(s)); k ? p.lineTo(x, y) : p.moveTo(x, y); });
+    for (let k = pts.length - 1; k >= 0; k--) { const [x, y] = this.at(pts[k], outer(pts[k])); p.lineTo(x, y); }
+    p.closePath(); return p;
+  }
+  offPathF(s0, s1, off, step = 6) {
+    const p = new Path2D(); let first = true;
+    for (let s = s0; s <= s1; s += step) { const [x, y] = this.at(s, off(s)); first ? p.moveTo(x, y) : p.lineTo(x, y); first = false; }
+    return p;
+  }
+  /* Gravel: a speckled pattern, made once. */
+  gravel(g) {
+    if (!this._gravel) {
+      const c = document.createElement('canvas'); c.width = c.height = 24; const q = c.getContext('2d');
+      q.fillStyle = '#b8a47b'; q.fillRect(0, 0, 24, 24);
+      for (let k = 0; k < 70; k++) { q.fillStyle = ['#cbb991', '#9f8b63', '#d8c8a3', '#8f7c57'][k % 4]; q.fillRect((k * 37) % 24, (k * 53 + k * k) % 24, 1.4, 1.4); }
+      this._gravel = c;
+    }
+    return g.createPattern(this._gravel, 'repeat');
   }
   labels(g, corner, sector) {
     const { C, w } = this, L = C.L;
@@ -265,10 +331,9 @@ PW.Renderer = class Renderer {
     const pitOff = C.inside * w * .95;
     g.save(); g.strokeStyle = 'rgba(232,238,250,.22)'; g.lineWidth = Math.max(2, w * .28); g.stroke(this.offPath(-L * .085, L * .065, pitOff)); g.restore();
     for (let b = 0; b < 10; b++) { const [x, y, a] = this.at(L * (.006 + b * .0035), pitOff + C.inside * w * .3); g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = 'rgba(232,238,250,.22)'; g.fillRect(-1, -w * .12, 2, w * .24); g.restore(); }
+    this.kerbs(g, '#f2f4f8', '#e8322e');
     C.corners.forEach((ci, n) => {
       const s = ci * C.ds, side = -Math.sign(C.K[ci]);
-      const p = this.offPath(s - 35, s + 35, side * (w / 2 + 2), 3);
-      g.save(); g.lineCap = 'butt'; g.lineWidth = 3.5; g.strokeStyle = '#f2f4f8'; g.stroke(p); g.setLineDash([5, 5]); g.strokeStyle = '#e8322e'; g.stroke(p); g.restore();
       const [lx, ly] = this.at(s, side * (w * 2.1 + 6));
       g.font = `600 ${Math.max(9, w * .6)}px "JetBrains Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = 'rgba(200,212,235,.42)'; g.fillText('T' + (n + 1), lx, ly);
@@ -323,10 +388,10 @@ PW.Renderer = class Renderer {
     ctx.drawImage(this.bgLayer, 0, 0, W, H);
     if (cam) {
       // chase cam: zoomed in, rotating with the car so it always points up the screen
-      const [cx, cy, ca] = this.at(cam.dist, cam.lat * w * .3);
+      const [cx, cy, ca] = this.at(cam.dist, cam.lat * w * .26);
       const target = ca + Math.PI / 2; let da = target - (this.camA ?? target); da = Math.atan2(Math.sin(da), Math.cos(da));
       this.camA = (this.camA ?? target) + da * Math.min(1, (dtR || .016) * 3);
-      const Z = Math.max(2.2, Math.min(5, 38 / w * 1.3));
+      const Z = Math.max(2.8, Math.min(7, 38 / w * 1.9));
       ctx.save(); ctx.translate(W / 2, H * .62); ctx.rotate(-this.camA); ctx.scale(Z, Z); ctx.translate(-cx, -cy);
     } else if (view.drift) {
       // Live Art: a slow push-in and pan, like a camera on a crane
@@ -338,6 +403,12 @@ PW.Renderer = class Renderer {
     if (this.style === 'circuit') {
       const prog = race.startT === undefined ? 0 : Math.min(1, (race.leaderLap() - 1) / Math.max(1, race.laps - 1));
       ctx.save(); ctx.globalAlpha = (.04 + .22 * prog) * (1 - .6 * rain); ctx.strokeStyle = '#121417'; ctx.lineWidth = w * .3; ctx.lineJoin = 'round'; ctx.stroke(this.path); ctx.restore();
+      if (view.dominance) {   // track dominance: each mini-sector in the colour of the fastest car through it
+        const n = view.dominance.length;
+        ctx.save(); ctx.lineCap = 'butt'; ctx.lineWidth = w * .22; ctx.globalAlpha = .75;
+        view.dominance.forEach((col, k) => { if (!col) return; ctx.strokeStyle = col; ctx.stroke(this.offPath(L * k / n, L * (k + 1) / n - 2, 0, 4)); });
+        ctx.restore();
+      }
       if (this.marks.length) {
         ctx.save(); ctx.strokeStyle = 'rgba(10,11,13,.5)'; ctx.lineWidth = Math.max(1, w * .07); ctx.lineCap = 'round';
         for (const m of this.marks) for (const o of [-.22, .22]) ctx.stroke(this.offPath(m.s - 34, m.s, (m.lat * .3 + o) * w, 3));
@@ -352,10 +423,10 @@ PW.Renderer = class Renderer {
     }
     // debris
     for (const d of race.debris) {
-      const [x, y, a] = this.at(d.s, d.lat * w * .3);
+      const [x, y, a] = this.at(d.s, d.lat * w * .26);
       ctx.save(); ctx.translate(x, y); ctx.rotate(a + d.a); ctx.fillStyle = d.c; ctx.fillRect(-d.r, -d.r * .4, d.r * 2, d.r * .8); ctx.restore();
     }
-    const latPx = w * .3, len = Math.max(15, w * 1.3), wid = len * .36, detail = true;
+    const latPx = w * .26, len = cam ? w * .58 : Math.max(11, w * 1.0), wid = len * .36, detail = true;   // cars close to true scale against the track
     const order = race.order.slice().reverse();
     // trails
     if (!this.reduce) for (const c of order) {

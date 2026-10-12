@@ -26,7 +26,7 @@ PW.buildCircuit = function (def) {
   if (real) P = P.filter((p, i) => { const q = P[(i - 1 + P.length) % P.length]; return i === 0 || Math.hypot(p[0] - q[0], p[1] - q[1]) > 2; });
   const raw = spline(P, real ? 12 : 40), m = raw.length, cum = [0];
   for (let i = 1; i <= m; i++) { const a = raw[i - 1], b = raw[i % m]; cum[i] = cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]); }
-  const Ld = cum[m], L = def.length || Ld, ds = L / N;
+  const Ld = Math.round(cum[m] * 1e6) / 1e6, L = def.length || Ld, ds = L / N;
   let X = new Float64Array(N), Y = new Float64Array(N);
   for (let i = 0, seg = 0; i < N; i++) {
     const tg = i / N * Ld;
@@ -59,6 +59,8 @@ PW.buildCircuit = function (def) {
   const Xr = rot(X), Yr = rot(Y), Kr = rot(K);
   const sc = L / Ld;
   for (let i = 0; i < N; i++) { Xr[i] *= sc; Yr[i] *= sc; }
+  const qz = (arr, k) => { for (let i = 0; i < N; i++) arr[i] = Math.round(arr[i] * k) / k; };
+  qz(Xr, 1e6); qz(Yr, 1e6); qz(Kr, 1e12);
 
   const V = new Float64Array(N);
   for (let i = 0; i < N; i++) V[i] = Math.min(VMAX, Math.sqrt(ALAT / Math.max(Math.abs(Kr[i]), 1e-6)));
@@ -66,7 +68,17 @@ PW.buildCircuit = function (def) {
     for (let i = 0; i < 2 * N; i++) { const a = i % N, b = (i + 1) % N; V[b] = Math.min(V[b], Math.sqrt(V[a] * V[a] + 2 * ACC * ds)); }
     for (let i = 2 * N; i > 0; i--) { const a = i % N, b = (i - 1) % N; V[b] = Math.min(V[b], Math.sqrt(V[a] * V[a] + 2 * BRAKE * ds)); }
   }
+  // Racing line: outside on the way in, clipping the inside at the apex, out wide again on exit.
+  // The curvature minus its average a little before and after does exactly that. +1 = right of the centre line.
+  const D = Math.max(3, Math.round(45 / ds)), line = new Float64Array(N);
+  for (let i = 0; i < N; i++) line[i] = Kr[i] - .5 * (Kr[(i - D + N) % N] + Kr[(i + D) % N]);
+  for (let p = 0; p < 3; p++) { const c = line.slice(), h = Math.max(2, D >> 1); for (let i = 0; i < N; i++) { let s = 0; for (let d = -h; d <= h; d++) s += c[(i + d + N) % N]; line[i] = s / (2 * h + 1); } }
+  const mags = Array.from(line, Math.abs).sort((a, b) => a - b), lm = mags[Math.floor(N * .95)] || 1;
+  for (let i = 0; i < N; i++) line[i] = Math.max(-1, Math.min(1, line[i] / lm));
+  // Round the geometry a little, so every browser ends up with exactly the same numbers (synced races depend on it)
+  qz(V, 1e9); qz(line, 1e9);
   let T = 0, turn = 0; for (let i = 0; i < N; i++) { T += ds / V[i]; turn += Kr[i] * ds; }
+  T = Math.round(T * 1e6) / 1e6;
 
   const peaks = [];
   for (let i = 0; i < N; i++) {
@@ -87,7 +99,7 @@ PW.buildCircuit = function (def) {
   runs.sort((a, b) => b[1] - a[1]);
   const drs = (runs.filter(([, n]) => n * ds >= 400).length ? runs.filter(([, n]) => n * ds >= 400) : runs.filter(([, n]) => n * ds >= 200).slice(0, 1)).slice(0, 2)
     .map(([i0, n]) => [((i0 % N) * ds + n * ds * .12) % L, ((i0 % N) * ds + n * ds - 40) % L]);
-  return { def, L, ds, X: Xr, Y: Yr, K: Kr, V, T, corners, drs, inside: Math.sign(turn) || 1 };
+  return { def, L, ds, X: Xr, Y: Yr, K: Kr, V, T, corners, drs, line, inside: Math.sign(turn) || 1 };
 };
 
 /* Turn an imported file into a circuit definition.

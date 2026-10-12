@@ -14,6 +14,9 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 
 | | |
 |---|---|
+| **World Race** | Every Lapwall on Earth watches the same race at the same moment. A new race starts every 6 minutes on the world clock; the circuit and the whole race come from the time slot, so no server is involved and nothing is sent anywhere. Pick a winner before the lights go out and build your pundit score. |
+| **Race Rooms** | Put your friends' names on the grid, pick a circuit and a start time, and send the link or QR code (plus a calendar invite). Everyone who opens it sees the same race live, on any device; late arrivals jump straight to the live moment. Rematch in one tap. |
+| **Live telemetry** | Press `T`: speed, gear, revs, throttle, brake, DRS and battery for the car you follow, a speed trace against their best lap and the car ahead, purple/green/yellow mini-sectors, a battle forecast ("DRS range in 2 laps"), live win chances, and track dominance coloured onto the map. |
 | **Live Art** | The race as moving art for a wall screen: no timing tower or buttons, a slow camera drift, cuts to the closest battle in chase and onboard view, and a museum-style caption for each circuit. Press `A` to cycle Race view, Ambient and Live Art. |
 | **Day and night** | Floodlights come up at dusk and the track glows under them at night, with warm light at sunrise and sunset, all following your local clock. Sparks fly from the cars on fast straights, rubber builds up on the racing line, and spins leave marks. |
 | **Wall display mode** | The desktop app runs Live Art full screen and locked: no cursor, keyboard ignored, screen kept awake, restarts itself if anything goes wrong. Leave with `Ctrl+Shift+L` and the owner's PIN. |
@@ -22,14 +25,14 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 | **Season** | Every race scores points (25-18-15…, plus fastest lap). Standings carry over, so friends can race each other all season. |
 | **Zoom-bys** | A full-size car with a driver's name and flag drives across the screen, slowing down mid-screen so you can read it. The desktop app does it above your taskbar while you work. |
 | **Send a Zoom-by** | Make a link or QR code for a birthday, congratulations, good luck or your own words. When someone opens it, your car drives across their screen with the message and confetti. Share it by email, text or any app. |
-| **Camera views** | TV map, a zoomed chase cam that follows your car through every corner, and an onboard driver's-eye view built from the real circuit shape, with the cars ahead, barriers, kerbs and a live steering-wheel display. Press `V`. |
+| **Camera views** | TV map, a zoomed chase cam that follows your car through every corner, and an onboard view from the cockpit: halo, front tyres turning, mirrors that show the car behind, a steering wheel with a live display held in the driver's gloves, kerbs and gravel on the right sides, catch fences and floodlight towers. Press `V`. |
 | **Career mode** | Start in the slowest car, earn development points, upgrade engine, aero and tyres, and sign for better teams at the end of each 8-race season. |
 | **Elimination Cup** | A knockout tournament: the slowest quarter is out after every race until four drivers race the final. |
 | **Crashes and recovery** | Crashed cars stay where they stopped until a recovery crane lifts them over the wall and drives off. The safety car leaves from the pit exit, leads the pack and peels back into the pit lane. |
 | **Podium celebration** | The top three climb the podium and spray champagne after every race. |
 | **Fantasy league** | Each friend backs two drivers; their season points decide who wins the league. |
 | **Real race weekends** | On a real race weekend, Lapwall races that circuit and counts down to the next one. Calendar data only, never live timing. |
-| **Realistic circuit map** | Grass, run-off, gravel traps, tyre walls, grandstands, pit garages and grid boxes, plus a world locator. Neon night style and three zoom levels. |
+| **Realistic circuit map** | Kerbs where real circuits have them (apex on the inside, entry and exit on the outside), gravel or asphalt run-off shaped around each corner, tyre walls, concrete walls on street circuits, grandstands, pit garages and grid boxes. Cars follow a racing line, keep real following distances and run close to true scale. Neon night style and three zoom levels. |
 | **Pit-board reminders** | Drink water, stretch, rest your eyes, or your own message, carried past on a pit board at the interval you choose. |
 | **Private by design** | No accounts, no tracking, no network requests. Settings stay on your device. See [SECURITY.md](SECURITY.md). |
 | **Incidents** | Spins with tyre smoke, crashes into the barrier with debris, yellow flags, safety cars, red flags with a standing restart, and punctures after contact. |
@@ -113,6 +116,8 @@ js/vendor/qrcode.js     QR code generator (MIT)
 js/main.js              app shell: race weekend loop, HUD, settings, controls, Live Art director
 js/carside.js           side-view race car (Zoom-bys, garage)
 js/capture.js           frame-exact clock for recording TV videos (?capture)
+js/telemetry.js         live telemetry panel and track dominance
+js/sync.js, room.html   World Race and Race Rooms: seeded races synced by the clock, invite links
 tools/                  local server, single-file build, track converter, TV video recorder,
                         licence signing (license.mjs) and USB kit builder (usb-kit.mjs)
 install/                Raspberry Pi kiosk installer

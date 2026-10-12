@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Make a Race Room · Lapwall</title>
+<meta name="description" content="Invite friends to a Lapwall race. Everyone who opens the link watches the same race at the same moment.">
+<meta name="theme-color" content="#07090d">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/share.css">
+</head>
+<body>
+<div class="chq"></div>
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="eyebrow">Lapwall · Race Room</div>
+      <h1>Race your friends</h1>
+      <p>Put your friends on the grid, pick a circuit and a start time, and send the link. Everyone who opens it watches the same race at the same moment, on any phone, laptop or TV. No accounts, nothing uploaded.</p>
+    </div>
+    <a class="btn" href="index.html">Back to Lapwall</a>
+  </header>
+
+  <div class="grid">
+    <form class="card" id="form" autocomplete="off">
+      <div class="two">
+        <label class="f"><span>Room name</span><input type="text" id="n" maxlength="40" placeholder="Friday night race"></label>
+        <label class="f"><span>Your name</span><input type="text" id="h" maxlength="20" placeholder="Arun"></label>
+      </div>
+      <label class="f"><span>Friends on the grid · one name per line, up to 19</span><textarea id="g" rows="6" placeholder="Sabina&#10;Max&#10;Priya"></textarea></label>
+      <div class="two">
+        <label class="f"><span>Circuit</span><select id="t"></select></label>
+        <label class="f"><span>Race length</span><select id="l"><option value="6">Sprint · 6 laps · about 3 min</option><option value="8" selected>Short · 8 laps · about 4 min</option><option value="12">Full · 12 laps · about 6 min</option></select></label>
+      </div>
+      <div class="f"><span>Lights out</span>
+        <div class="occ" id="when">
+          <label><input type="radio" name="when" value="5" checked><span>In 5 minutes</span></label>
+          <label><input type="radio" name="when" value="15"><span>In 15 minutes</span></label>
+          <label><input type="radio" name="when" value="60"><span>In 1 hour</span></label>
+          <label><input type="radio" name="when" value="at"><span>Pick a time</span></label>
+        </div>
+        <input type="datetime-local" id="at" hidden>
+      </div>
+      <button class="primary" type="submit">Create the invite</button>
+      <p class="note">The race is decided by a random seed in the link, so every screen runs it identically. Anyone who opens the link late jumps straight to the live moment.</p>
+    </form>
+
+    <section class="card">
+      <div class="eyebrow">Starting grid</div>
+      <ol class="gridlist" id="preview"></ol>
+      <div class="result" id="result" hidden>
+        <div class="eyebrow">Your invite</div>
+        <div class="linkrow"><input type="text" id="link" readonly aria-label="Invite link"><button type="button" id="copy">Copy</button></div>
+        <div class="actions">
+          <a class="btn primary" id="open" href="#">Open the room</a>
+          <a class="btn" id="sms" href="#">Text</a>
+          <a class="btn" id="email" href="#">Email</a>
+          <button type="button" id="share" hidden>Share</button>
+          <a class="btn" id="ics" href="#" download="lapwall-race.ics">Add to calendar</a>
+        </div>
+        <div class="qr"><canvas id="qr" width="200" height="200" aria-label="QR code for the invite"></canvas><p>Point a phone camera at this to join. Put it on the TV and everyone in the room can scan it.</p></div>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="js/data.js"></script>
+<script src="js/tracks-real.js"></script>
+<script src="js/garage.js"></script>
+<script src="js/share.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/vendor/qrcode.js"></script>
+<script src="js/room.js"></script>
+</body>
+</html>

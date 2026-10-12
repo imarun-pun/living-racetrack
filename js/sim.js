@@ -2,43 +2,52 @@
    Emits events through race.on(type, data) for the HUD, ticker and cameras. */
 window.PW = window.PW || {};
 (() => {
-const mod = PW.mod, rnd = (a, b) => a + Math.random() * (b - a);
+const mod = PW.mod;
+/* Seeded random numbers (mulberry32): the same seed gives the same race on every device. */
+PW.rng = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+PW.hashSeed = str => { let h = 2166136261 >>> 0; for (const ch of String(str)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
+const q = (v, k) => Math.round(v * k) / k;
 const CP = 40; // timing checkpoints per lap
 
 PW.Race = class Race {
   constructor(C, opt) {
     this.C = C; this.opt = opt; this.listeners = [];
+    // Synced races (World Race, Race Rooms) use a seed, fixed steps and their own start lights, so every screen agrees.
+    this.rand = opt.seed != null ? PW.rng(opt.seed) : Math.random;
+    this.auto = !!opt.auto; this.gridT = 0; this.hold = this.rnd(.6, 2.2);
     this.laps = opt.laps; this.state = 'grid'; this.t = 0;
     this.leaderCp = []; this.sc = null; this.yellow = null; this.redUsed = false; this.red = null;
     this.fl = { t: Infinity, car: null }; this.finishOrder = []; this.finishAt = 0; this.debris = [];
     this.pending = null;
     // weather
-    let kind = opt.weather === 'auto' ? (Math.random() < .65 ? 'dry' : Math.random() < .55 ? 'shower' : 'wet') : opt.weather;
+    let kind = opt.weather === 'auto' ? (this.rand() < .65 ? 'dry' : this.rand() < .55 ? 'shower' : 'wet') : opt.weather;
     this.weather = { kind, rain: kind === 'wet' ? .8 : 0, target: kind === 'wet' ? .8 : 0,
-      startLap: kind === 'shower' ? Math.floor(rnd(.25, .55) * this.laps) + 1 : Infinity,
-      endLap: kind === 'wet' ? (Math.random() < .5 ? Math.floor(rnd(.55, .8) * this.laps) : Infinity)
-            : kind === 'shower' && Math.random() < .5 ? Math.floor(rnd(.7, .9) * this.laps) : Infinity };
-    this.scAt = Math.random() < .3 ? (Math.floor(rnd(3, Math.max(4, this.laps - 3))) + Math.random()) * C.L : Infinity;
+      startLap: kind === 'shower' ? Math.floor(this.rnd(.25, .55) * this.laps) + 1 : Infinity,
+      endLap: kind === 'wet' ? (this.rand() < .5 ? Math.floor(this.rnd(.55, .8) * this.laps) : Infinity)
+            : kind === 'shower' && this.rand() < .5 ? Math.floor(this.rnd(.7, .9) * this.laps) : Infinity };
+    this.scAt = this.rand() < .3 ? (Math.floor(this.rnd(3, Math.max(4, this.laps - 3))) + this.rand()) * C.L : Infinity;
     const teams = opt.teams;
     // team order: random each race, or the career's fixed pecking order (best team first)
-    const order = opt.teamOrder || teams.map((t, i) => i).sort(() => Math.random() - .5), teamPace = [];
-    order.forEach((t, r) => teamPace[t] = 1 - r * .003 - Math.random() * (opt.teamOrder ? .001 : .0025));
+    const order = opt.teamOrder || this.shuffle(teams.map((t, i) => i)), teamPace = [];
+    order.forEach((t, r) => teamPace[t] = 1 - r * .003 - this.rand() * (opt.teamOrder ? .001 : .0025));
     const entrants = Array.isArray(opt.entrants) && opt.entrants.length >= 2 ? opt.entrants : opt.drivers.map((d, i) => i);
     this.cars = entrants.map(i => {
       const d = opt.drivers[i];
-      const code = d.code, team = Math.floor(i / 2), start = this.weather.rain > .4 ? 'I' : (Math.random() < .5 ? 'S' : 'M');
-      const pace = teamPace[team] + rnd(-.0015, .0015) + (opt.bonus && opt.bonus[i] || 0);
-      return { i, code, name: d.name, flag: d.flag, num: d.num, team, color: teams[team].color, color2: teams[team].color2, pace, quali: pace + rnd(-.004, .004),
+      const code = d.code, team = Math.floor(i / 2), start = this.weather.rain > .4 ? 'I' : (this.rand() < .5 ? 'S' : 'M');
+      const pace = teamPace[team] + this.rnd(-.0015, .0015) + (opt.bonus && opt.bonus[i] || 0);
+      return { i, code, name: d.name, flag: d.flag, num: d.num, team, color: teams[team].color, color2: teams[team].color2, pace, quali: pace + this.rnd(-.004, .004),
         dist: 0, v: 0, lat: 0, latT: 0, gridLat: 0, yaw: 0, tyre: start, tyreLaps: 0,
-        pitLap: Math.max(2, Math.round(this.laps * (start === 'S' ? rnd(.33, .48) : rnd(.48, .64)))), planDone: false,
+        pitLap: Math.max(2, Math.round(this.laps * (start === 'S' ? this.rnd(.33, .48) : this.rnd(.48, .64)))), planDone: false,
         pitNext: false, inPit: false, stopped: false, stopT: 0, stopDur: 0,
         noise: 0, cp: -1, cpT: 0, lapStart: 0, best: Infinity, finished: false, out: false,
-        passT: null, passCd: 0, react: rnd(.15, .45), lastPos: 0, spin: null, crash: null, puncture: false };
+        passT: null, passCd: 0, react: this.rnd(.15, .45), lineK: this.rnd(.78, 1), lastPos: 0, spin: null, crash: null, puncture: false };
     });
     const quali = [...this.cars].sort((a, b) => b.quali - a.quali);
     this.grid(opt.format === 'reverse' ? quali.reverse() : quali, 0);
     this.order = [...this.cars].sort((a, b) => a.lastPos - b.lastPos);
   }
+  rnd(a, b) { return a + this.rand() * (b - a); }
+  shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
   on(fn) { this.listeners.push(fn); }
   emit(type, d) { for (const f of this.listeners) f(type, d || {}); }
   leaderLap() { const l = this.running()[0]; return l ? Math.max(1, Math.min(this.laps, Math.floor(l.dist / this.C.L) + 1)) : 1; }
@@ -47,7 +56,7 @@ PW.Race = class Race {
   grid(list, base) {
     list.forEach((c, g) => {
       c.dist = base - 10 - g * 8; c.v = 0; c.gridLat = c.lat = c.latT = (g % 2 ? 1.1 : -1.1); c.lastPos = g;
-      c.react = rnd(.15, .45); c.passT = null; c.spin = null; c.yaw = 0;
+      c.react = this.rnd(.15, .45); c.passT = null; c.spin = null; c.yaw = 0;
     });
     this.gridBase = base;
   }
@@ -70,28 +79,37 @@ PW.Race = class Race {
     this.emit('regrid', { lap: Math.floor(base / L) + 1 });
   }
 
+  /* Start lights in a synced race: how many are lit, from the race's own clock (in real seconds). */
+  lightsOn() { const s = this.gridT; return s < 1 ? 0 : Math.min(5, Math.floor((s - 1) / .9) + 1); }
   step(dt) {
     this.t += dt;
+    if (this.auto) {
+      if (this.state === 'grid') {
+        this.gridT += dt / (this.opt.timeScale || 1);
+        if (this.gridT > 1 + 4 * .9 + .9 + this.hold) { this.start(); this.gridT = 0; this.emit('lights-out', {}); }
+      }
+      if (this.red && this.red.phase === 'stopped' && this.t - this.red.st > 4 * (this.opt.timeScale || 1) / 3.75) { this.regrid(); this.hold = this.rnd(.6, 2.2); }
+    }
     const C = this.C, L = C.L, cpLen = L / CP, cars = this.cars, W = this.weather;
     const run = this.running(), leader = run[0];
     const lapNow = leader ? Math.floor(leader.dist / L) + 1 : 1;
     // weather
     if (this.state === 'racing') {
-      if (lapNow >= W.startLap && W.target === 0 && lapNow < W.endLap) { W.target = rnd(.6, .9); this.emit('rain', {}); }
+      if (lapNow >= W.startLap && W.target === 0 && lapNow < W.endLap) { W.target = this.rnd(.6, .9); this.emit('rain', {}); }
       if (lapNow >= W.endLap && W.target > 0) { W.target = 0; this.emit('drying', {}); }
     }
     W.rain += Math.sign(W.target - W.rain) * Math.min(Math.abs(W.target - W.rain), .006 * dt);
     // planned safety car
     if (!this.sc && this.state === 'racing' && leader && leader.dist >= this.scAt) { this.scAt = Infinity; this.deploySC('debris'); }
     if (this.yellow && this.t > this.yellow.until) this.yellow = null;
-    if (this.red && this.red.phase === 'stopping' && (this.t - this.red.t > 6 || run.every(c => c.v < 1 || c.inPit))) { this.red.phase = 'stopped'; this.emit('red-stopped', {}); }
+    if (this.red && this.red.phase === 'stopping' && (this.t - this.red.t > 6 || run.every(c => c.v < 1 || c.inPit))) { this.red.phase = 'stopped'; this.red.st = this.t; this.emit('red-stopped', {}); }
 
     const onRoad = cars.filter(c => !c.out).sort((a, b) => mod(a.dist, L) - mod(b.dist, L));
     for (const c of cars) {
       if (c.out) continue;
       const s = mod(c.dist, L), i = Math.min(PW.N - 1, Math.floor(s / C.ds)), lapIdx = Math.floor(c.dist / L);
       const ty = PW.TYRES[c.tyre];
-      c.noise += (Math.random() - .5) * .004 * dt - c.noise * .4 * dt; c.noise = Math.max(-.004, Math.min(.004, c.noise));
+      c.noise += (this.rand() - .5) * .004 * dt - c.noise * .4 * dt; c.noise = Math.max(-.004, Math.min(.004, c.noise));
       const wet = c.tyre === 'I' ? .905 + .02 * W.rain : 1 - .22 * W.rain;
       let target = C.V[i] * c.pace * (ty.base - ty.deg * c.tyreLaps) * wet * (1 + c.noise) * (c.puncture ? .72 : 1);
       if (c.finished) target = Math.min(target, C.V[i] * .55);
@@ -109,7 +127,7 @@ PW.Race = class Race {
       if (this.state === 'racing' && this.opt.incidents && !this.sc && !c.inPit && !c.spin && !c.crash && !c.finished && c.v > 28 && Math.abs(C.K[i]) > 1 / 160 && this.t - this.startT > 20) {
         const slick = c.tyre !== 'I';
         const rate = .0004 * (1 + 2 * W.rain) * (slick ? 1 + 5 * W.rain : 1) * (c.puncture ? 3 : 1);
-        if (Math.random() < rate * dt) Math.random() < .3 ? this.startCrash(c, i) : this.startSpin(c, i);
+        if (this.rand() < rate * dt) this.rand() < .3 ? this.startCrash(c, i) : this.startSpin(c, i);
       }
       if (c.spin) {
         const sp = c.spin; sp.t += dt; const p = Math.min(1, sp.t / sp.dur);
@@ -142,8 +160,8 @@ PW.Race = class Race {
         target = Math.min(target, 22);
         if (!c.stopped && lapIdx >= c.pitLapIdx && s > c.boxS && s < L * .5) {
           if (c.stopT === 0) {
-            const slow = Math.random() < .05;
-            c.stopDur = slow ? rnd(5.5, 9) : rnd(2.1, 2.9);
+            const slow = this.rand() < .05;
+            c.stopDur = slow ? this.rnd(5.5, 9) : this.rnd(2.1, 2.9);
             const remain = this.laps - lapIdx;
             const nt = W.rain > .4 ? 'I' : c.puncture ? (remain > this.laps * .5 ? 'H' : 'M') : remain > this.laps * .5 ? 'H' : remain > 4 ? 'M' : 'S';
             c.newTyre = nt; c.slowStop = slow;
@@ -170,18 +188,23 @@ PW.Race = class Race {
       if (ahead && !c.inPit && !c.spin && !c.crash && this.state !== 'grid') {
         const blue = ahead.finished || ahead.dist < c.dist - L * .5 || ahead.spin || ahead.crash || ahead.puncture;
         if (this.sc && !blue) { if (gap < 24) target = Math.min(target, ahead.v * (gap < 14 ? .9 : 1)); }
-        else if (gap < 11 && ahead !== c.passT) {
-          const straight = Math.abs(C.K[i]) < 1 / 350;
-          if (target > ahead.v * 1.002 && (straight || blue) && c.passCd <= 0) {
-            c.passT = ahead; c.latT = ahead.lat > 0 ? -1.15 : 1.15;
-            if (this.opt.incidents && !blue && Math.random() < .012 && this.state === 'racing') {
-              const victim = Math.random() < .5 ? c : ahead; victim.puncture = true;
+        else if (gap < 9 + c.v * .2 && ahead !== c.passT) {
+          // keep a real following distance (about 0.2 s plus a car length), so the field never piles up
+          const straight = Math.abs(C.K[i]) < 1 / 350, close = 9 + c.v * .2;
+          if (target > ahead.v * 1.002 && (straight || blue) && c.passCd <= 0 && gap < close * .8) {
+            c.passT = ahead; c.latT = Math.max(-1.2, Math.min(1.2, ahead.lat > 0 ? ahead.lat - 1.6 : ahead.lat + 1.6));
+            if (this.opt.incidents && !blue && this.rand() < .012 && this.state === 'racing') {
+              const victim = this.rand() < .5 ? c : ahead; victim.puncture = true;
               this.emit('contact', { a: c, b: ahead, victim });
             }
-          } else target = Math.min(target, ahead.v * (gap < 6 ? .96 : 1));
+          } else target = Math.min(target, ahead.v * (gap < close * .55 ? .94 : gap < close * .8 ? .985 : 1));
         }
       }
-      if (!c.passT && !c.inPit && !c.spin && !c.crash) c.latT = c.dist - this.gridBase < 220 ? c.gridLat * Math.max(0, Math.min(1, 1 - (c.dist - this.gridBase) / 220)) : 0;
+      if (!c.passT && !c.inPit && !c.spin && !c.crash) {
+        // follow the racing line (each driver a little differently), blending in from the grid slot after the start
+        const line = (C.line ? C.line[i] : 0) * c.lineK * 1.05, k = Math.max(0, Math.min(1, 1 - (c.dist - this.gridBase) / 220));
+        c.latT = c.gridLat * k + line * (1 - k);
+      }
       if (c.inPit) c.latT = C.inside * 2.95;
 
       if (!c.crash) {
@@ -250,6 +273,12 @@ PW.Race = class Race {
       });
     }
     if (this.state === 'finished' && (this.running().every(c => c.finished) || this.t - this.finishAt > 150)) { this.state = 'done'; this.emit('done', {}); }
+    // Synced races: round the state a little every step, so tiny maths differences between browsers can never grow
+    if (this.auto) {
+      for (const c of cars) { c.dist = q(c.dist, 1e6); c.v = q(c.v, 1e6); c.lat = q(c.lat, 1e6); c.latT = q(c.latT, 1e6); c.noise = q(c.noise, 1e9); }
+      if (this.scCar) { this.scCar.dist = q(this.scCar.dist, 1e6); this.scCar.v = q(this.scCar.v, 1e6); this.scCar.lat = q(this.scCar.lat, 1e6); }
+      W.rain = q(W.rain, 1e9);
+    }
   }
 
   inDRS(s) {
@@ -257,21 +286,21 @@ PW.Race = class Race {
     return this.C.drs.some(([a, b]) => PW.mod(s - a, L) <= PW.mod(b - a, L));
   }
   startSpin(c, i) {
-    c.spin = { t: 0, dur: rnd(4, 6), dir: Math.random() < .5 ? -1 : 1, side: -Math.sign(this.C.K[i]) || 1 };
+    c.spin = { t: 0, dur: this.rnd(4, 6), dir: this.rand() < .5 ? -1 : 1, side: -Math.sign(this.C.K[i]) || 1 };
     this.yellow = { s: c.dist, until: this.t + 12, corner: this.cornerAt(i) };
     this.emit('spin', { car: c, corner: this.cornerAt(i) });
   }
   startCrash(c, i) {
-    c.crash = { t: 0, side: -Math.sign(this.C.K[i]) || 1, yaw: rnd(-.9, .9) };
+    c.crash = { t: 0, side: -Math.sign(this.C.K[i]) || 1, yaw: this.rnd(-.9, .9) };
     this.yellow = { s: c.dist, until: this.t + 30, corner: this.cornerAt(i) };
     const s = c.dist;
-    for (let k = 0; k < 16; k++) this.debris.push({ s: s + rnd(-10, 40), lat: rnd(-1.5, 3.5) * c.crash.side, r: rnd(.8, 2.2), a: rnd(0, 6.28), c: Math.random() < .6 ? c.color : '#c9ced8' });
+    for (let k = 0; k < 16; k++) this.debris.push({ s: s + this.rnd(-10, 40), lat: this.rnd(-1.5, 3.5) * c.crash.side, r: this.rnd(.8, 2.2), a: this.rnd(0, 6.28), c: this.rand() < .6 ? c.color : '#c9ced8' });
     this.emit('crash', { car: c, corner: this.cornerAt(i) });
   }
   afterCrash(c) {
     if (this.state !== 'racing') return;
     const lapsLeft = this.laps - this.leaderLap();
-    const r = Math.random();
+    const r = this.rand();
     if (!this.redUsed && lapsLeft > 3 && r < .18) {
       this.redUsed = true; this.state = 'red'; this.red = { t: this.t, phase: 'stopping' }; this.sc = null; this.scCar = null;
       this.emit('red', { car: c });
@@ -283,7 +312,7 @@ PW.Race = class Race {
     const L = this.C.L, base = Math.floor(leader.dist / L) * L + L * .02;
     const exitDist = base + (base - leader.dist > 30 ? 0 : L);
     this.scCar = { dist: exitDist, v: 12, lat: this.C.inside * 2.95, latT: this.C.inside * 2.95, phase: 'exit', onTrack: false };
-    for (const c of this.running()) if (!c.planDone && c.dist / this.C.L > this.laps * .3 && Math.random() < .55) c.pitNext = true;
+    for (const c of this.running()) if (!c.planDone && c.dist / this.C.L > this.laps * .3 && this.rand() < .55) c.pitNext = true;
     this.emit('sc', { reason, car });
   }
   cornerAt(i) {

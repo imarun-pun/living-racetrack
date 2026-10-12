@@ -125,3 +125,11 @@ input[type="text"], input[type="number"], select { font: 500 15px/1.2 var(--body
   .two { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .msgcard, .start, .react, .msgcard .actions { transition: none; } .bokeh span, .glass::after, .hint { animation: none; } }
+
+/* Race Room maker */
+textarea { font: 500 15px/1.4 var(--body); color: var(--fg); background: #151a23; border: 1px solid var(--line); border-radius: 5px; padding: 10px; width: 100%; resize: vertical; }
+input[type="datetime-local"] { font: 500 15px/1.2 var(--body); color: var(--fg); background: #151a23; border: 1px solid var(--line); border-radius: 5px; padding: 10px; margin-top: 8px; }
+.gridlist { margin: 0; padding: 0 0 0 26px; columns: 2; column-gap: 24px; font: 500 14px/1.9 var(--body); color: var(--muted); }
+.gridlist li { break-inside: avoid; }
+.gridlist li.you { color: var(--fg); font-weight: 600; }
+.gridlist .b { display: inline-block; width: 4px; height: 13px; margin-right: 8px; vertical-align: -1px; border-radius: 1px; }

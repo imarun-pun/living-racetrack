@@ -15,6 +15,7 @@ Lapwall is built so there is nothing to steal.
 - Desktop app (Electron): context isolation, sandboxed renderers and no Node.js access in any page; navigation, pop-ups, embedded web views and device permissions (camera, microphone, location, notifications) are all blocked. The Zoom-by window is click-through and never takes focus.
 - Hardened packaging: Electron fuses switch off run-as-Node, `NODE_OPTIONS` and the inspector switches, and the app only loads from its packaged archive. Developer tools are off in packaged builds.
 - Wall display mode: kiosk window, keyboard and right-click swallowed, closing blocked. Leaving needs the owner's PIN, stored as a salted scrypt hash, with a lockout after five wrong tries that doubles each time.
+- World Race and Race Rooms work without any server. A room invite link carries only the room name, the names typed in, the circuit, the start time and a random seed, and all of it is validated (length limits, no markup, known circuits only, start time within 60 days) before use. Opening a link sends nothing anywhere.
 - Licences: Ed25519 signatures. The app ships only the public key, so it can check a licence but cannot create one. The private key stays on the seller's own computer and is never in this repository. Licence files are size-limited and strictly validated before use.
 - Dependencies: the web app has none. The desktop app only uses Electron and electron-builder for packaging; Dependabot watches them and the GitHub Actions for updates.
 
