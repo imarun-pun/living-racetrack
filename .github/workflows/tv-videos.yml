@@ -51,7 +51,7 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Render
         run: python tools/render-video.py --track ${{ matrix.id }} --light ${{ inputs.light }} --laps ${{ inputs.laps }} --size ${{ inputs.size }} --out "out/${{ matrix.n }} ${{ matrix.name }} (${{ inputs.light }}).mp4"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tv-video-${{ matrix.n }}
           path: out/*.mp4
@@ -65,7 +65,7 @@ jobs:
           pattern: tv-video-*
           merge-multiple: true
           path: tv-videos
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tv-videos
           path: tv-videos/*.mp4
