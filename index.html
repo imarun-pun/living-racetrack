@@ -27,6 +27,7 @@
     <div class="rows" id="rows"></div>
   </aside>
   <div class="clock" id="clock">--:--<small id="date"></small></div>
+  <figure class="locator" id="locator" hidden><canvas aria-label="Where this circuit is in the world"></canvas><figcaption id="loccap"></figcaption></figure>
   <div class="lights" id="lights" hidden>
     <div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div><div class="unit"><i></i><i></i></div>
   </div>
@@ -43,10 +44,12 @@
       <div><dt>Corners</dt><dd id="acorn">–</dd></div>
       <div><dt>Laps</dt><dd id="alaps">–</dd></div>
       <div><dt>Leader</dt><dd id="alead">–</dd></div>
+      <div id="anext-wrap" hidden><dt>Next real race weekend</dt><dd id="anext">–</dd></div>
     </dl>
   </section>
   <div class="banner" id="banner" hidden></div>
   <div class="podium" id="podium" hidden>
+    <canvas class="celebrate" id="celebrate" aria-hidden="true"></canvas>
     <div class="pod-card">
       <div class="chq"></div>
       <div class="pod-body">
@@ -72,6 +75,7 @@
   <nav class="controls" aria-label="Display controls">
     <button id="bmode" type="button">Ambient</button>
     <button id="bnext" type="button">Next race</button>
+    <a class="btn" id="bsend" href="send.html" target="_blank" rel="noopener">Send a drive-by</a>
     <button id="bset" type="button">Customize</button>
     <button id="bfull" type="button">Full screen</button>
   </nav>
@@ -87,6 +91,9 @@
         <option value="single">One track on repeat</option>
       </select></label>
       <label class="field">Track <select id="s-single"></select></label>
+      <label class="field check"><input type="checkbox" id="s-weekend"> Follow the real race calendar: on a real race weekend, race that circuit</label>
+      <label class="field">Map style <select id="s-style"><option value="circuit">Realistic circuit</option><option value="neon">Neon night</option></select></label>
+      <label class="field">Map zoom <select id="s-zoom"><option value="close">Close</option><option value="normal">Normal</option><option value="wide">Wide, with surroundings</option></select></label>
       <div class="row-btns">
         <label class="btn">Import track file<input type="file" id="s-import" accept=".geojson,.json,application/json"></label>
         <button type="button" id="s-clear">Remove imported</button>
@@ -112,10 +119,15 @@
       <p class="hint" id="s-season">No races yet.</p>
       <ol class="season-list" id="s-standings"></ol>
       <button type="button" id="s-season-reset">Start a new season</button>
+      <p class="hint"><b>Fantasy league.</b> Each player backs two drivers. Their score is those drivers' season points. Compete with friends and family.</p>
+      <div class="players" id="s-players"></div>
+      <div class="row-btns"><button type="button" id="s-addplayer">Add a player</button></div>
+      <ol class="season-list" id="s-league"></ol>
     </fieldset>
     <fieldset>
       <legend>Drive-bys and pit-board reminders</legend>
       <label class="field">Drive-by speed <select id="s-dbspeed"><option value="fast">Fast · 5 s</option><option value="cruise">Cruise · 9 s</option><option value="parade">Parade lap · 14 s</option></select></label>
+      <label class="field">Car that drives by <select id="s-dbcar"><option value="-1">Random driver</option></select></label>
       <label class="field check"><input type="checkbox" id="s-driveby"> Random drive-bys in ambient view</label>
       <div class="field"><label><input type="checkbox" id="s-rw"> Drink water</label> <select id="s-rwm" aria-label="Drink water interval"><option value="30">Every 30 min</option><option value="45">Every 45 min</option><option value="60">Every hour</option><option value="90">Every 90 min</option></select></div>
       <div class="field"><label><input type="checkbox" id="s-rs"> Stretch break</label> <select id="s-rsm" aria-label="Stretch break interval"><option value="45">Every 45 min</option><option value="60">Every hour</option><option value="90">Every 90 min</option><option value="120">Every 2 hours</option></select></div>
@@ -150,6 +162,11 @@
 <script src="js/render.js"></script>
 <script src="js/pitcam.js"></script>
 <script src="js/garage.js"></script>
+<script src="js/share.js"></script>
+<script src="js/celebrate.js"></script>
+<script src="js/world.js"></script>
+<script src="js/locator.js"></script>
+<script src="js/calendar.js"></script>
 <script src="js/driveby.js"></script>
 <script src="js/main.js"></script>
 </body>

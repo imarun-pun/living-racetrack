@@ -50,6 +50,14 @@ In the web app, cars drive by in the ambient view every few minutes (turn it off
 
 **Customize → Drive-bys and pit-board reminders.** Turn on *Drink water*, *Stretch break* or *Rest your eyes* and pick how often. *My own message* puts any short text (up to 28 characters) on the board, for example "Call Mom". *Drive-by speed* sets how long a car takes to cross the screen: 5, 9 or 14 seconds. Press `W` for a water reminder right now. In the desktop app the same reminders are set from the tray menu; your own message text comes from the Pit Wall settings.
 
+## Send a drive-by
+
+Click **Send a drive-by** (or open `send.html`). Pick an occasion, write who it's for and a short message, choose your flag, colour and number, then **Create link and QR code**. Send it by email, text or any app, or print the QR code on a card. The whole message is stored inside the link after the `#`, so nothing is uploaded anywhere.
+
+## Fantasy league and real race weekends
+
+In **Customize → Season**, add up to eight players and give each two drivers. Their score is those drivers' season points. In **Customize → Tracks**, *Follow the real race calendar* makes Pit Wall race the real weekend's circuit; update `js/calendar.js` once a year with the new dates.
+
 ## Teams
 
 Edit names and both livery colours in the Customize panel, or change the defaults in `PW.DEFAULT_TEAMS` in `js/data.js`. Driver codes and car numbers are in `PW.CODES` and `PW.NUMBERS`.

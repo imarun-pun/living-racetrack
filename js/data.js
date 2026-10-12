@@ -112,6 +112,11 @@ PW.DEFAULT_SETTINGS = {
   driveby: true,            // drive-by cars in ambient view
   drivebyMins: 4,
   drivebySpeed: 'cruise',   // fast | cruise | parade
+  drivebyDriver: -1,        // -1 random, otherwise a driver slot
+  mapStyle: 'circuit',      // circuit | neon
+  mapZoom: 'normal',        // close | normal | wide
+  weekendSync: true,        // follow the real race calendar
+  players: [],              // fantasy league: { name, a, b }
   reminders: { water: true, waterMins: 60, stretch: false, stretchMins: 90, eyes: false, eyesMins: 30, custom: '', customMins: 0 },
   custom: []                // imported tracks
 };

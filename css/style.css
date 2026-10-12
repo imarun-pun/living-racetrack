@@ -120,7 +120,9 @@ body.dim #track, body.dim .hud { filter: brightness(.42) saturate(.8); }
 .stats dd { margin: 0; font: 700 20px/1 var(--display); letter-spacing: .03em; font-variant-numeric: tabular-nums; }
 
 /* Podium */
-.podium { inset: 0; display: grid; place-items: center; background: rgba(5, 7, 10, .55); padding-inline: 16px; }
+.podium { inset: 0; display: grid; justify-items: center; align-content: start; padding: calc(28px + env(safe-area-inset-top, 0px)) 16px 0; background: rgba(5, 7, 10, .72); }
+.podium .celebrate { position: absolute; inset: 0; width: 100%; height: 100%; }
+.podium .pod-card { position: relative; }
 .pod-card { width: min(440px, 100%); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .chq { height: 18px; background: repeating-conic-gradient(#eef2f8 0 25%, #07090d 0 50%) 0 0 / 18px 18px; }
 .pod-body { padding: 20px 22px 18px; display: grid; gap: 14px; }
@@ -159,6 +161,16 @@ body.dim #track, body.dim .hud { filter: brightness(.42) saturate(.8); }
 .standings li .p, .season-list li .p { font-variant-numeric: tabular-nums; }
 .garage .fact { grid-column: 1 / -1; font: 400 15px/1.5 var(--body); color: var(--fg); border-left: 3px solid var(--accent); padding-left: 12px; max-width: 70ch; }
 .garage .fact b { font: 600 10.5px/1 var(--mono); letter-spacing: .14em; color: var(--accent); display: block; margin-bottom: 4px; }
+
+/* World locator */
+.locator { margin: 0; top: calc(78px + env(safe-area-inset-top, 0px)); right: 20px; width: 188px; display: grid; gap: 4px; transition: opacity .8s; }
+.locator canvas { width: 188px; height: 94px; border: 1px solid var(--line); border-radius: 4px; display: block; }
+.locator figcaption { font: 500 10px/1.3 var(--mono); letter-spacing: .1em; color: var(--muted); text-align: right; }
+body.ambient .locator { top: calc(24px + env(safe-area-inset-top, 0px)); left: 28px; right: auto; }
+.players { display: grid; gap: 6px; }
+.player-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 30px; gap: 6px; align-items: center; }
+.player-row button { padding: 6px 0; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* Controls */
 .controls { right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; pointer-events: auto; transition: opacity .6s; flex-wrap: wrap; justify-content: flex-end; }
@@ -208,6 +220,7 @@ body.ambient .clock { font-size: clamp(48px, 8vw, 110px); }
   .clock { right: 16px; font-size: 22px; }
   .lights { top: auto; bottom: 46%; }
   .amb { left: 16px; }
+  .locator { display: none; }
   .pitcam { top: calc(150px + env(safe-area-inset-top, 0px)); bottom: auto; right: 16px; width: calc(100% - 32px); }
   .garage .g-info { grid-template-columns: 1fr; left: 16px; right: 16px; gap: 16px; }
   .garage .g-top { left: 16px; right: 16px; }

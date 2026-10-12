@@ -14,7 +14,8 @@ window.pitwall.onDrive(opts => {
     : opts && PW.REMINDERS[opts.kind] ? PW.REMINDERS[opts.kind] : undefined;
   if (board === null) { window.pitwall.done(); return; }
   const fav = typeof S.favTeam === 'number' && S.favTeam >= 0 ? S.favTeam : -1;
-  const pool = fav >= 0 && Math.random() < .5 ? [fav * 2, fav * 2 + 1] : drivers.map((d, i) => i);
+  const chosen = Number.isInteger(S.drivebyDriver) && S.drivebyDriver >= 0 && S.drivebyDriver < 20 ? [S.drivebyDriver] : null;
+  const pool = chosen || (fav >= 0 && Math.random() < .5 ? [fav * 2, fav * 2 + 1] : drivers.map((d, i) => i));
   const i = pool[Math.floor(Math.random() * pool.length)], d = drivers[i];
   const tyres = ['S', 'M', 'H'];
   db.start({ name: d.name, flag: d.flag, num: d.num, team: teams[Math.floor(i / 2)], tyre: tyres[Math.floor(Math.random() * 3)], sound: !!(opts && opts.sound),

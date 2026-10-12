@@ -30,6 +30,18 @@ SOFTWARE.
 
 The dataset's own disclaimer applies: it is unofficial and not associated with the Formula 1 companies, and the related marks belong to their owners.
 
+## QR codes: qrcode-generator
+
+`js/vendor/qrcode.js` is QR Code Generator for JavaScript by Kazuhiko Arase, MIT License (notice kept in the file). "QR Code" is a registered trademark of DENSO WAVE.
+
+## World map: Natural Earth via world-atlas
+
+`js/world.js` is simplified from Natural Earth 1:110m land (public domain), distributed in the world-atlas package by Mike Bostock under the ISC License: "Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies."
+
+## Race calendar
+
+`js/calendar.js` lists publicly announced race-weekend dates and places. It contains no timing, results or other championship data.
+
 ## Fonts
 
 Saira, Saira Condensed and JetBrains Mono are bundled in `fonts/` (from the Fontsource packages) under the SIL Open Font License 1.1. License texts: `fonts/OFL-Saira.txt` (covers Saira and Saira Condensed) and `fonts/OFL-JetBrainsMono.txt`. They are served locally, so the app makes no requests to Google or any other third party.

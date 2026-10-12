@@ -13,6 +13,10 @@ function load() {
   s.custom = Array.isArray(s.custom) ? s.custom.filter(t => t && typeof t.id === 'string' && Array.isArray(t.pts) && t.pts.length >= 8 && t.pts.length <= 20000 &&
     t.pts.every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))).map(t => ({ ...t, kind: 'custom', name: String(t.name || 'Custom track').replace(/[<>]/g, '').slice(0, 40), hue: '#ff6fb1', length: +t.length || undefined })) : [];
   if (!['race', 'ambient'].includes(s.mode)) s.mode = 'race';
+  s.players = Array.isArray(s.players) ? s.players.slice(0, 8).map(p => ({ name: String((p && p.name) || 'Player').replace(/[<>\u0000-\u001f]/g, '').slice(0, 16), a: Math.max(0, Math.min(19, +(p && p.a) || 0)), b: Math.max(0, Math.min(19, +(p && p.b) || 0)) })) : [];
+  if (!['circuit', 'neon'].includes(s.mapStyle)) s.mapStyle = 'circuit';
+  if (!['close', 'normal', 'wide'].includes(s.mapZoom)) s.mapZoom = 'normal';
+  s.drivebyDriver = Number.isInteger(+s.drivebyDriver) && +s.drivebyDriver >= -1 && +s.drivebyDriver < 20 ? +s.drivebyDriver : -1;
   return s;
 }
 let S = load();
@@ -26,6 +30,8 @@ function playlist() {
   return by && by.length ? by : all;
 }
 function pickNext(cur) {
+  const wk = S.weekendSync && S.rotation !== 'single' && PW.weekendNow && PW.weekendNow();
+  if (wk) { const d = (PW.REAL_CIRCUITS || []).find(t => t.id === wk.track); if (d) return d; }
   if (S.rotation === 'single') return allTracks().find(t => t.id === S.single) || PW.ORIGINAL_CIRCUITS[0];
   const list = playlist().filter(t => !cur || t.id !== cur.id);
   return list.length ? list[Math.floor(Math.random() * list.length)] : cur;
@@ -36,6 +42,7 @@ const renderer = new PW.Renderer($('track'));
 const pitcam = new PW.PitCam($('pitcam'));
 const garage = new PW.Garage($('garage'));
 const driveBy = new PW.DriveBy($('driveby'));
+const celebration = new PW.Celebration($('celebrate'));
 let nextDrive = performance.now() + 45000;
 let C, race, TS = 3, phase = 'race', phaseT = 0, round = 1, lightsT = 0, hold = 1, paused = false, nextDef = null, fade = null;
 const pairT = {};
@@ -47,14 +54,18 @@ function newRace(def) {
   race = new PW.Race(C, { laps: S.laps, incidents: S.incidents, weather: S.weather, teams: teams(), drivers: drivers() });
   race.on(onEvent);
   phase = 'race'; phaseT = 0; lightsT = 0; hold = rnd(.6, 2.2); firstStart = true; fade = null;
-  pitcam.clear(); garage.hide(); $('podium').hidden = true; hideBanner(); $('fader').classList.remove('on');
+  pitcam.clear(); garage.hide(); $('podium').hidden = true; celebration.stop(); hideBanner(); $('fader').classList.remove('on');
   document.documentElement.style.setProperty('--accent', def.hue || '#38c6ff');
-  const kind = def.kind === 'real' ? 'Real-layout replica' : def.kind === 'custom' ? 'Imported track' : 'Original circuit';
+  const wk = PW.weekendNow && PW.weekendNow();
+  const kind = wk && def.id === wk.track ? 'Real race weekend · ' + PW.weekendLabel(wk) : def.kind === 'real' ? 'Real-layout replica' : def.kind === 'custom' ? 'Imported track' : 'Original circuit';
   $('round').textContent = round; $('kind').textContent = kind + ' · Simulated race';
   $('cname').textContent = def.name; $('aname').textContent = def.name; $('aplace').textContent = def.place || kind;
   $('alen').textContent = (C.L / 1000).toFixed(3) + ' km'; $('acorn').textContent = C.corners.length; $('alaps').textContent = S.laps;
   nextDef = pickNext(def);
-  msgs = []; renderTicker(); buildRows(); layout();
+  msgs = []; renderTicker(); buildRows(); layout(); drawLocator();
+  const nx = PW.weekendNext && PW.weekendNext();
+  $('anext-wrap').hidden = !nx && !wk;
+  $('anext').textContent = wk ? 'This weekend · ' + wk.place : nx ? `${nx.place} · in ${nx.days} day${nx.days === 1 ? '' : 's'}` : '';
   if (race.weather.kind === 'wet') say('Wet race · everyone starts on intermediates', 'wx');
 }
 
@@ -126,6 +137,10 @@ function standings(n = 20) {
   return D.map((d, i) => ({ ...d, i, pts: se.pts[i] || 0, wins: (se.wins || [])[i] || 0, color: T[Math.floor(i / 2)].color }))
     .sort((a, b) => b.pts - a.pts || b.wins - a.wins || a.i - b.i).slice(0, n);
 }
+function league() {
+  const se = S.season || { pts: [] };
+  return S.players.map(p => ({ ...p, pts: (se.pts[p.a] || 0) + (p.b !== p.a ? se.pts[p.b] || 0 : 0) })).sort((a, b) => b.pts - a.pts);
+}
 function showPodium() {
   phase = 'podium'; phaseT = 0; pitcam.clear(); hideBanner();
   const [p1, p2, p3] = race.finishOrder, T = teams();
@@ -141,11 +156,18 @@ function showPodium() {
   const lead = standings(1)[0];
   $('pnext').dataset.season = lead ? `Championship leader: ${PW.shortName(lead.name)} · ${lead.pts} pts` : '';
   $('podium').hidden = false;
+  celebration.start(race.finishOrder.slice(0, 3).map(c => ({ name: c.name, code: c.code, flag: c.flag, color: c.color, color2: c.color2 })));
+  const lg = league(); $('pnext').dataset.season += lg.length ? ` · League: ${lg.slice(0, 2).map(p => `${p.name} ${p.pts}`).join(', ')}` : '';
   const useFav = S.favTeam >= 0 && round % 2 === 0;
   const ti = useFav ? S.favTeam : p1.team, a = race.cars[ti * 2], b = race.cars[ti * 2 + 1];
   garageInfo = { team: T[ti], num: ti === p1.team ? p1.num : a.num, drivers: [a, b].map(c => `#${c.num} ${c.name}`),
     fact: PW.FACTS[Math.floor(Math.random() * PW.FACTS.length)], why: useFav ? 'Your team' : 'Race winner', tyreC: PW.TYRES[p1.tyre].c,
     seasonTitle: `Championship · after ${S.season.races} race${S.season.races === 1 ? '' : 's'}`, standings: standings(6) };
+  if (S.players.length && round % 2) {
+    const D = drivers(), T2 = teams();
+    garageInfo.seasonTitle = `Fantasy league · after ${S.season.races} race${S.season.races === 1 ? '' : 's'}`;
+    garageInfo.standings = league().slice(0, 6).map(p => ({ name: `${p.name} (${D[p.a].code}, ${D[p.b].code})`, flag: D[p.a].flag, color: T2[Math.floor(p.a / 2)].color, pts: p.pts }));
+  }
 }
 
 // ---------- HUD ----------
@@ -199,6 +221,13 @@ function renderClock() {
 }
 
 // ---------- Layout ----------
+function drawLocator() {
+  const d = C && C.def, el = $('locator');
+  el.hidden = !(d && typeof d.lat === 'number');
+  if (el.hidden) return;
+  PW.drawLocator(el.querySelector('canvas'), d.lat, d.lon, d.hue || '#38c6ff');
+  $('loccap').textContent = PW.fmtCoord(d.lat, d.lon);
+}
 function layout() {
   const DPR = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight, narrow = W < 760;
   const row = narrow ? 24 : Math.max(16, Math.min(28, (H - 122 - 60) / 20));
@@ -207,7 +236,7 @@ function layout() {
   if (S.mode === 'ambient') r = narrow ? { x: 16, y: H * .16, w: W - 32, h: H * .5 } : { x: W * .05, y: H * .1, w: W * .9, h: H * .62 };
   else if (narrow) r = { x: 16, y: 150, w: W - 32, h: Math.max(140, H - 150 - (5 * row + 120)) };
   else r = { x: 290, y: 104, w: W - 290 - 36, h: H - 104 - 120 };
-  renderer.layout(W, H, DPR, r);
+  renderer.layout(W, H, DPR, r, { style: S.mapStyle, zoom: S.mapZoom });
 }
 
 // ---------- Loop ----------
@@ -240,13 +269,14 @@ function frame(now) {
     if (phase === 'podium') {
       phaseT += dtR; $('pnext').textContent = `${$('pnext').dataset.season ? $('pnext').dataset.season + ' · ' : ''}Next: ${nextDef.name} in ${Math.max(0, Math.ceil(12 - phaseT))}s`;
       if (phaseT > 12) {
-        $('podium').hidden = true;
+        $('podium').hidden = true; celebration.stop();
         if (S.garage && garageInfo) { phase = 'garage'; phaseT = 0; garage.show(garageInfo); } else { round++; newRace(nextDef); }
       }
     } else if (phase === 'garage') {
       phaseT += dtR; garage.update(dtR, 20 - phaseT, nextDef.name);
       if (phaseT > 20) { round++; newRace(nextDef); }
     }
+    if (phase === 'podium') celebration.update(dtR);
     pitcam.update(dtR);
     if (race.pending && now - pendT > 2200) {
       const p = race.pending, pair = [p.a.i, p.b.i].sort().join('-');
@@ -272,7 +302,7 @@ let lightsOff = 0;
 function startDriveBy(board) {
   const pool = race.cars.filter(c => !c.out), favs = pool.filter(c => c.team === S.favTeam);
   const list = favs.length && Math.random() < .5 ? favs : pool;
-  const car = list[Math.floor(Math.random() * list.length)] || race.cars[0];
+  const car = S.drivebyDriver >= 0 ? race.cars[S.drivebyDriver] : list[Math.floor(Math.random() * list.length)] || race.cars[0];
   driveBy.start({ name: car.name, flag: car.flag, num: car.num, team: teams()[car.team], tyre: car.tyre, sound: false,
     seconds: PW.DRIVEBY_SPEEDS[S.drivebySpeed] || PW.DRIVEBY_SPEEDS.cruise, board });
   if (!board) nextDrive = performance.now() + S.drivebyMins * 60000 * (.6 + Math.random() * .8);
@@ -326,7 +356,7 @@ addEventListener('keydown', e => {
 let idleT;
 const wake = () => { document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => { if ($('settings').hidden) document.body.classList.add('idle'); }, 4000); };
 ['pointermove', 'pointerdown', 'keydown'].forEach(e => addEventListener(e, wake)); wake();
-let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layout, 120); });
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { layout(); drawLocator(); }, 120); });
 
 // ---------- Settings panel ----------
 function fillTrackSelect() {
@@ -358,7 +388,7 @@ function fillDrivers() {
     ['df', 'dn', 'dnum'].forEach(p => $(`${p}-${i}`).addEventListener(p === 'df' ? 'change' : 'input', () => {
       S.drivers = S.drivers || [];
       S.drivers[i] = { name: $(`dn-${i}`).value.trim() || PW.DEFAULT_DRIVERS[i].name, flag: $(`df-${i}`).value, num: Math.max(0, Math.min(99, parseInt($(`dnum-${i}`).value, 10) || 0)) };
-      save(); applyDrivers(); renderSeason();
+      save(); applyDrivers(); renderSeason(); fillDriveCar();
     }));
   });
 }
@@ -368,9 +398,30 @@ function applyDrivers() {
   race.cars.forEach(c => { const d = D[c.i]; c.name = d.name; c.code = d.code; c.flag = d.flag; c.num = d.num; });
   buildRows(); renderHUD();
 }
+function fillDriveCar() {
+  const D = drivers();
+  $('s-dbcar').innerHTML = '<option value="-1">Random driver</option>' + D.map((d, i) => `<option value="${i}">#${d.num} ${PW.esc(d.name)}</option>`).join('');
+  $('s-dbcar').value = S.drivebyDriver;
+}
+function fillPlayers() {
+  const D = drivers(), opts = D.map((d, i) => `<option value="${i}">${PW.esc(d.code)} · ${PW.esc(d.name)}</option>`).join('');
+  $('s-players').innerHTML = S.players.map((p, i) => `<div class="player-row"><input type="text" id="pn-${i}" value="${PW.esc(p.name)}" maxlength="16" aria-label="Player ${i + 1} name">` +
+    `<select id="pa-${i}" aria-label="Player ${i + 1} first driver">${opts}</select><select id="pb-${i}" aria-label="Player ${i + 1} second driver">${opts}</select>` +
+    `<button type="button" id="px-${i}" aria-label="Remove player ${i + 1}">✕</button></div>`).join('');
+  S.players.forEach((p, i) => {
+    $(`pa-${i}`).value = p.a; $(`pb-${i}`).value = p.b;
+    $(`pn-${i}`).addEventListener('input', e => { p.name = e.target.value.replace(/[<>]/g, '').slice(0, 16) || 'Player'; save(); renderSeason(); });
+    $(`pa-${i}`).addEventListener('change', e => { p.a = +e.target.value; save(); renderSeason(); });
+    $(`pb-${i}`).addEventListener('change', e => { p.b = +e.target.value; save(); renderSeason(); });
+    $(`px-${i}`).addEventListener('click', () => { S.players.splice(i, 1); save(); fillPlayers(); renderSeason(); });
+  });
+  $('s-addplayer').disabled = S.players.length >= 8;
+}
 function renderSeason() {
   const se = S.season || { races: 0 };
   $('s-season').textContent = se.races ? `${se.races} race${se.races === 1 ? '' : 's'} so far. Points: 25-18-15-12-10-8-6-4-2-1, plus 1 for the fastest lap in the top ten.` : 'No races yet. Points start counting from the next chequered flag.';
+  const D = drivers();
+  $('s-league').innerHTML = S.players.length ? league().map(p => `<li><span class="b" style="background:${teams()[Math.floor(p.a / 2)].color}"></span>${flagImg(D[p.a].flag)}<span class="n">${PW.esc(p.name)} · ${D[p.a].code} + ${D[p.b].code}</span><span class="p">${p.pts}</span></li>`).join('') : '';
   $('s-standings').innerHTML = se.races ? standings(10).map(d => `<li><span class="b" style="background:${d.color}"></span>${flagImg(d.flag)}<span class="n">${PW.esc(d.name)}</span><span class="p">${d.pts}</span></li>`).join('') : '';
 }
 function applyTeams() {
@@ -387,7 +438,8 @@ function syncForm() {
   const R = S.reminders;
   $('s-rw').checked = R.water; $('s-rwm').value = R.waterMins; $('s-rs').checked = R.stretch; $('s-rsm').value = R.stretchMins;
   $('s-re').checked = R.eyes; $('s-rem').value = R.eyesMins; $('s-rc').value = R.custom || ''; $('s-rcm').value = R.customMins;
-  fillTeams(); fillDrivers(); renderSeason();
+  $('s-weekend').checked = S.weekendSync; $('s-style').value = S.mapStyle; $('s-zoom').value = S.mapZoom;
+  fillTeams(); fillDrivers(); fillDriveCar(); fillPlayers(); renderSeason();
 }
 const bind = (id, fn, ev = 'change') => $(id).addEventListener(ev, e => { fn(e.target); save(); });
 bind('s-rotation', el => { S.rotation = el.value; nextDef = pickNext(C.def); });
@@ -400,6 +452,14 @@ bind('s-pitcam', el => { S.pitcam = el.checked; if (!el.checked) pitcam.clear();
 bind('s-garage', el => { S.garage = el.checked; });
 bind('s-fav', el => { S.favTeam = +el.value; });
 bind('s-dbspeed', el => { S.drivebySpeed = el.value; });
+bind('s-dbcar', el => { S.drivebyDriver = +el.value; });
+bind('s-weekend', el => { S.weekendSync = el.checked; nextDef = pickNext(C.def); });
+bind('s-style', el => { S.mapStyle = el.value; layout(); });
+bind('s-zoom', el => { S.mapZoom = el.value; layout(); });
+$('s-addplayer').addEventListener('click', () => {
+  if (S.players.length >= 8) return;
+  const n = S.players.length; S.players.push({ name: 'Player ' + (n + 1), a: (n * 2) % 20, b: (n * 2 + 1) % 20 }); save(); fillPlayers(); renderSeason();
+});
 const remBind = (id, key, num) => bind(id, el => { S.reminders[key] = num ? +el.value : el.checked; delete remDue[key.replace(/Mins$/, '')]; });
 remBind('s-rw', 'water'); remBind('s-rwm', 'waterMins', true); remBind('s-rs', 'stretch'); remBind('s-rsm', 'stretchMins', true);
 remBind('s-re', 'eyes'); remBind('s-rem', 'eyesMins', true); remBind('s-rcm', 'customMins', true);
@@ -432,6 +492,9 @@ $('s-clear').addEventListener('click', () => {
   save(); syncForm(); $('s-imsg').className = 'hint'; $('s-imsg').textContent = 'Imported tracks removed.';
 });
 $('s-reset').addEventListener('click', () => { S = { ...structuredClone(PW.DEFAULT_SETTINGS), mode: S.mode }; save(); syncForm(); applyTeams(); round++; newRace(pickNext(null)); });
+
+// Send-a-drive-by opens next to this page on the web, or on the public site otherwise
+if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test(location.hostname)) $('bsend').href = PW.HOME + 'send.html';
 
 // ---------- Boot ----------
 syncForm();

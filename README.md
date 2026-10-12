@@ -18,6 +18,11 @@ It runs in any modern browser, installs like an app, works offline, and can run 
 | **Your drivers** | Put yourself and your friends on the grid: names, national flags (50 countries) and car numbers. |
 | **Season** | Every race scores points (25-18-15…, plus fastest lap). Standings carry over, so friends can race each other all season. |
 | **Drive-bys** | A full-size car with a driver's name and flag drives across the screen, slowing down mid-screen so you can read it. The desktop app does it above your taskbar while you work. |
+| **Send a drive-by** | Make a link or QR code for a birthday, congratulations, good luck or your own words. When someone opens it, your car drives across their screen with the message and confetti. Share it by email, text or any app. |
+| **Podium celebration** | The top three climb the podium and spray champagne after every race. |
+| **Fantasy league** | Each friend backs two drivers; their season points decide who wins the league. |
+| **Real race weekends** | On a real race weekend, Pit Wall races that circuit and counts down to the next one. Calendar data only, never live timing. |
+| **Realistic circuit map** | Grass, run-off, gravel traps, tyre walls, grandstands, pit garages and grid boxes, plus a world locator. Neon night style and three zoom levels. |
 | **Pit-board reminders** | Drink water, stretch, rest your eyes, or your own message, carried past on a pit board at the interval you choose. |
 | **Private by design** | No accounts, no tracking, no network requests. Settings stay on your device. See [SECURITY.md](SECURITY.md). |
 | **Incidents** | Spins with tyre smoke, crashes into the barrier with debris, yellow flags, safety cars, red flags with a standing restart, and punctures after contact. |
@@ -90,6 +95,11 @@ js/render.js            canvas drawing: track, cars, weather, effects
 js/pitcam.js            pit-stop camera
 js/garage.js            garage break and the original car design
 js/driveby.js           drive-by car with name tag (web and desktop)
+js/celebrate.js         podium and champagne
+js/share.js, send.html, go.html   send-a-drive-by links and QR codes
+js/calendar.js          real race-weekend dates
+js/world.js, locator.js world locator map
+js/vendor/qrcode.js     QR code generator (MIT)
 js/main.js              app shell: race weekend loop, HUD, settings, controls
 tools/                  local server, single-file build, track converter
 install/                Raspberry Pi kiosk installer

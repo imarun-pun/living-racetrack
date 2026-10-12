@@ -11,6 +11,8 @@ Living Racetrack starts as free software anyone can put on a screen, and grows i
 
 **v0.4:** slower drive-bys that brake mid-screen; pit-board reminders (water, stretch, eyes, your own message); self-hosted fonts and a strict content security policy; desktop app hardening.
 
+**v0.5:** send-a-drive-by links and QR codes; podium champagne celebration; fantasy league; real race-weekend calendar; realistic circuit map with gravel traps, grandstands and pit garages; world locator; map zoom; choose the drive-by car.
+
 ## Next features
 
 ### Make it yours

@@ -35,13 +35,14 @@ PW.Renderer = class Renderer {
     this.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
   setCircuit(C) { this.C = C; }
-  layout(W, H, DPR, r) {
+  layout(W, H, DPR, r, opts = {}) {
     const C = this.C, N = PW.N;
+    this.style = opts.style || 'circuit';
     this.W = W; this.H = H; this.DPR = DPR;
     this.cv.width = Math.round(W * DPR); this.cv.height = Math.round(H * DPR);
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let i = 0; i < N; i++) { minX = Math.min(minX, C.X[i]); maxX = Math.max(maxX, C.X[i]); minY = Math.min(minY, C.Y[i]); maxY = Math.max(maxY, C.Y[i]); }
-    const pad = 30, S = Math.min((r.w - 2 * pad) / (maxX - minX), (r.h - 2 * pad) / (maxY - minY));
+    const pad = opts.zoom === 'close' ? 12 : opts.zoom === 'wide' ? 30 + Math.min(r.w, r.h) * .09 : 30, S = Math.min((r.w - 2 * pad) / (maxX - minX), (r.h - 2 * pad) / (maxY - minY));
     const ox = r.x + (r.w - (maxX - minX) * S) / 2, oy = r.y + (r.h - (maxY - minY) * S) / 2;
     this.SX = new Float64Array(N); this.SY = new Float64Array(N);
     for (let i = 0; i < N; i++) { this.SX[i] = ox + (C.X[i] - minX) * S; this.SY[i] = oy + (C.Y[i] - minY) * S; }
@@ -62,9 +63,111 @@ PW.Renderer = class Renderer {
     return p;
   }
   drawStatic() {
-    const { W, H, DPR, C, w } = this, L = C.L, hue = C.def.hue;
     this.layer.width = this.cv.width; this.layer.height = this.cv.height;
-    const g = this.layer.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const g = this.layer.getContext('2d'); g.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
+    if (this.style === 'circuit') this.drawCircuit(g); else this.drawNeon(g);
+  }
+  /* Realistic circuit: grass, run-off, gravel traps, tyre walls, grandstands, pit garages, grid boxes. */
+  drawCircuit(g) {
+    const { W, H, C, w } = this, L = C.L, inside = C.inside;
+    // grass with mown stripes and a little texture (seeded so it does not flicker between layouts)
+    g.fillStyle = '#1e3320'; g.fillRect(0, 0, W, H);
+    g.save(); g.globalAlpha = .028; g.fillStyle = '#9fd18f';
+    for (let x = -H; x < W; x += 90) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 45, 0); g.lineTo(x + 45 + H * .6, H); g.lineTo(x + H * .6, H); g.fill(); }
+    g.restore();
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 2600; k++) { g.fillStyle = rnd() < .5 ? 'rgba(0,0,0,.12)' : 'rgba(170,220,150,.06)'; g.fillRect(rnd() * W, rnd() * H, 2, 2); }
+    const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.max(W, H) * .75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    // verge and run-off
+    g.strokeStyle = '#2c4a2b'; g.lineWidth = w * 3.6; g.stroke(this.path);
+    g.strokeStyle = '#5a6066'; g.globalAlpha = .55; g.lineWidth = w * 1.9; g.stroke(this.path); g.globalAlpha = 1;
+    // gravel traps and tyre walls on the outside of corners
+    C.corners.forEach(ci => {
+      const s = ci * C.ds, side = -Math.sign(C.K[ci]);
+      g.save(); g.lineCap = 'round'; g.strokeStyle = '#bda87e'; g.lineWidth = w * 1.5;
+      g.stroke(this.offPath(s - 55, s + 45, side * w * 1.55, 4));
+      g.globalAlpha = .25; g.strokeStyle = '#8c7a55'; g.lineWidth = w * .5; g.stroke(this.offPath(s - 50, s + 40, side * w * 1.7, 4)); g.globalAlpha = 1;
+      g.lineCap = 'butt'; g.lineWidth = Math.max(2, w * .22); g.strokeStyle = '#e8eaee'; const wall = this.offPath(s - 60, s + 50, side * w * 2.45, 3); g.stroke(wall);
+      g.setLineDash([4, 4]); g.strokeStyle = '#d6332b'; g.stroke(wall); g.restore();
+    });
+    // grandstands along the main straight, outside
+    const out = -inside;
+    for (let k = 0; k < 3; k++) {
+      const s0 = -L * .055 + k * L * .022, [x, y, a] = this.at(s0, out * w * 2.9);
+      g.save(); g.translate(x, y); g.rotate(a);
+      const gw = this.segPx(s0, s0 + L * .018), gh = w * 1.5;
+      g.fillStyle = '#3d434c'; g.fillRect(0, out > 0 ? 0 : -gh, gw, gh);
+      for (let r = 1; r < 5; r++) { g.fillStyle = r % 2 ? '#2f6db5' : '#d9dde5'; g.fillRect(2, (out > 0 ? 0 : -gh) + r * gh / 5 - 1, gw - 4, 1.5); }
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, out > 0 ? gh : -gh - 3, gw, 3);
+      g.restore();
+    }
+    // pit lane, pit wall and garages, inside
+    const pitOff = inside * w * .95;
+    g.save(); g.lineCap = 'butt'; g.strokeStyle = '#3b3f45'; g.lineWidth = w * .7; g.stroke(this.offPath(-L * .085, L * .065, pitOff, 4));
+    g.strokeStyle = '#e8eaee'; g.lineWidth = 1.5; g.stroke(this.offPath(-L * .07, L * .05, inside * w * .6, 4)); g.restore();
+    for (let b = 0; b < 10; b++) {
+      const s0 = L * (.004 + b * .0035), [x, y, a] = this.at(s0, inside * w * 1.75), bw = Math.max(4, this.segPx(s0, s0 + L * .003)), bh = w * .9;
+      g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = '#4a5059'; g.fillRect(0, -bh / 2, bw, bh);
+      g.fillStyle = (PW.DEFAULT_TEAMS[b] || {}).color || '#888'; g.fillRect(0, inside > 0 ? -bh / 2 : bh / 2 - 2, bw, 2); g.restore();
+    }
+    // track: white edge lines and asphalt
+    g.strokeStyle = '#eef0f3'; g.lineWidth = w + 2.4; g.stroke(this.path);
+    g.strokeStyle = '#3a3e44'; g.lineWidth = w; g.stroke(this.path);
+    g.save(); g.globalAlpha = .18; g.strokeStyle = '#1d2024'; g.lineWidth = w * .35; g.stroke(this.path); g.restore();   // racing line rubber
+    this.kerbs(g, '#f2f4f8', '#d6332b');
+    // grid boxes
+    for (let k = 0; k < 20; k++) {
+      const [x, y, a] = this.at(-10 - k * 8, (k % 2 ? 1.1 : -1.1) * w * .3);
+      g.save(); g.translate(x, y); g.rotate(a); g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(w * .25, -w * .17); g.lineTo(w * .3, -w * .17); g.lineTo(w * .3, w * .17); g.lineTo(w * .25, w * .17); g.stroke(); g.restore();
+    }
+    this.labels(g, 'rgba(240,244,250,.65)', '#ffd43b');
+    this.startLine(g);
+    // start gantry
+    const [gx, gy, ga] = this.at(4, 0); g.save(); g.translate(gx, gy); g.rotate(ga);
+    g.fillStyle = '#111317'; g.fillRect(-2, -w * .9, 4, w * 1.8); g.fillStyle = '#ff2b2b';
+    for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(0, -w * .6 + k * w * .3, 1.4, 0, 6.29); g.fill(); }
+    g.restore();
+  }
+  segPx(a, b) { const [x1, y1] = this.at(a, 0), [x2, y2] = this.at(b, 0); return Math.hypot(x2 - x1, y2 - y1); }
+  kerbs(g, c1, c2) {
+    const { C, w } = this;
+    C.corners.forEach(ci => {
+      const s = ci * C.ds, side = -Math.sign(C.K[ci]);
+      const p = this.offPath(s - 35, s + 35, side * (w / 2 + 2), 3);
+      g.save(); g.lineCap = 'butt'; g.lineWidth = 3.5; g.strokeStyle = c1; g.stroke(p); g.setLineDash([5, 5]); g.strokeStyle = c2; g.stroke(p); g.restore();
+    });
+  }
+  labels(g, corner, sector) {
+    const { C, w } = this, L = C.L;
+    C.corners.forEach((ci, n) => {
+      const [lx, ly] = this.at(ci * C.ds, -Math.sign(C.K[ci]) * (w * (this.style === 'circuit' ? 3.1 : 2.1) + 6));
+      g.font = `600 ${Math.max(9, w * .6)}px "JetBrains Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = corner; g.fillText('T' + (n + 1), lx, ly);
+    });
+    [[0, 'S1'], [L / 3, 'S2'], [2 * L / 3, 'S3']].forEach(([s, lab], k) => {
+      if (k) { const [x, y, a] = this.at(s, 0); g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = sector; g.globalAlpha = .8; g.fillRect(-1.5, -w / 2, 3, w); g.restore(); }
+      const [lx, ly] = this.at(s + (k ? 0 : 60), -C.inside * (w * 1.6 + 6));
+      g.font = `600 ${Math.max(9, w * .55)}px "JetBrains Mono", monospace`; g.fillStyle = sector; g.globalAlpha = .7; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(lab, lx, ly); g.globalAlpha = 1;
+    });
+    (C.drs || []).forEach(([a, b]) => {
+      const e = b < a ? b + L : b, side = -C.inside;
+      g.save(); g.setLineDash([6, 5]); g.strokeStyle = '#2fd780'; g.globalAlpha = .6; g.lineWidth = 2; g.lineCap = 'butt';
+      g.stroke(this.offPath(a, e, side * (w / 2 + 6), 5)); g.restore();
+      const [lx, ly] = this.at(a + 25, side * (w * 1.15 + 10));
+      g.font = `600 ${Math.max(8, w * .5)}px "JetBrains Mono", monospace`; g.fillStyle = '#2fd780'; g.globalAlpha = .8; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('DRS', lx, ly); g.globalAlpha = 1;
+    });
+  }
+  startLine(g) {
+    const w = this.w, [sx, sy, sa] = this.at(0, 0); g.save(); g.translate(sx, sy); g.rotate(sa);
+    const sq = w / 6; for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) { g.fillStyle = (r + c) % 2 ? '#0a0c10' : '#f2f4f8'; g.fillRect(-sq + r * sq, -w / 2 + c * sq, sq, sq); }
+    g.restore();
+  }
+  /* Neon night look: glowing track on a dark grid. */
+  drawNeon(g) {
+    const { W, H, C, w } = this, L = C.L, hue = C.def.hue;
     g.fillStyle = '#07090d'; g.fillRect(0, 0, W, H);
     const rg = g.createRadialGradient(W * .6, H * .5, 0, W * .6, H * .5, Math.max(W, H) * .7);
     rg.addColorStop(0, hue + '1c'); rg.addColorStop(1, hue + '00'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
@@ -159,7 +262,8 @@ PW.Renderer = class Renderer {
       const [x, y, a] = this.at(c.dist, c.lat * latPx);
       ctx.save(); ctx.translate(x, y); ctx.rotate(a + c.yaw);
       if (c.out) ctx.globalAlpha = .55;
-      ctx.shadowColor = c.color; ctx.shadowBlur = this.reduce || c.out ? 0 : w * .8;
+      if (this.style === 'circuit') { ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1.5; }
+      else { ctx.shadowColor = c.color; ctx.shadowBlur = this.reduce || c.out ? 0 : w * .8; }
       PW.drawCarTop(ctx, len, wid, c.color, c.color2, detail);
       ctx.restore();
       if (c.out && Math.floor(now / 400) % 2) { ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, len * .9, 0, 6.29); ctx.stroke(); }

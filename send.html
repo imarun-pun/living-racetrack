@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Send a Drive-by</title>
+<meta name="description" content="Make a link or QR code that sends a race car past someone's screen with your message.">
+<meta name="theme-color" content="#07090d">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/share.css">
+</head>
+<body>
+<div class="chq"></div>
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="eyebrow">Pit Wall · Send a drive-by</div>
+      <h1>Send a car past their screen</h1>
+      <p>Pick the moment, write the pit board, choose your car. You get a link and a QR code. When they open it, your car drives by with the message.</p>
+    </div>
+    <a class="btn" href="index.html">Back to Pit Wall</a>
+  </header>
+
+  <div class="grid">
+    <form class="card" id="form" autocomplete="off">
+      <div class="f"><span>Occasion</span><div class="occ" id="occ"></div></div>
+      <div class="two">
+        <label class="f"><span>For</span><input type="text" id="to" maxlength="20" placeholder="Their name"></label>
+        <label class="f" id="tWrap"><span>Board title</span><input type="text" id="t" maxlength="24" placeholder="e.g. YOU DID IT"></label>
+      </div>
+      <label class="f"><span>Message</span><input type="text" id="m" maxlength="60" placeholder="Short and sweet, up to 60 characters"></label>
+      <div class="two">
+        <label class="f"><span>From</span><input type="text" id="fr" maxlength="24" placeholder="Your name"></label>
+        <label class="f"><span>Your flag</span><select id="fl"><option value="">No flag</option></select></label>
+      </div>
+      <div class="two">
+        <div class="f"><span>Car colour</span><div class="swatches" id="sw"></div></div>
+        <label class="f"><span>Car number</span><input type="number" id="n" min="0" max="99" value="7"></label>
+      </div>
+      <button class="primary" type="submit">Create link and QR code</button>
+    </form>
+
+    <div class="card">
+      <div class="preview"><div class="eyebrow">Preview</div><canvas id="pv" aria-label="Preview of the drive-by"></canvas></div>
+      <section class="result" id="result" hidden aria-live="polite">
+        <div class="linkrow"><input type="text" id="link" readonly aria-label="Your drive-by link"><button type="button" id="copy">Copy</button></div>
+        <div class="actions">
+          <button type="button" id="share" hidden>Share…</button>
+          <a class="btn" id="email" href="#">Email</a>
+          <a class="btn" id="sms" href="#">Text message</a>
+          <a class="btn" id="open" href="#" target="_blank" rel="noopener">Open it</a>
+        </div>
+        <div class="qr"><canvas id="qr" width="148" height="148" aria-label="QR code for your drive-by"></canvas>
+          <p>Scan to open on a phone or TV. <a id="qrdl" href="#" download="drive-by-qr.png">Download the QR code</a></p></div>
+        <p class="note">Your message lives only inside this link. It is not uploaded or stored anywhere.</p>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="js/data.js"></script>
+<script src="js/flags.js"></script>
+<script src="js/garage.js"></script>
+<script src="js/driveby.js"></script>
+<script src="js/share.js"></script>
+<script src="js/vendor/qrcode.js"></script>
+<script src="js/send.js"></script>
+</body>
+</html>

@@ -24,8 +24,25 @@ function icon(g, kind, x, y, r) {
   } else if (kind === 'eye') {
     g.strokeStyle = '#ffc21a'; g.beginPath(); g.moveTo(-r, 0); g.quadraticCurveTo(0, -r * .9, r, 0); g.quadraticCurveTo(0, r * .9, -r, 0); g.stroke();
     g.fillStyle = '#ffc21a'; g.beginPath(); g.arc(0, 0, r * .3, 0, TAU); g.fill();
+  } else if (kind === 'cake') {
+    g.fillStyle = '#ff6fb1'; g.fillRect(-r * .8, -r * .05, r * 1.6, r * .9);
+    g.fillStyle = '#fff'; g.fillRect(-r * .8, -r * .05, r * 1.6, r * .22);
+    g.fillStyle = '#ffd43b'; [-.45, 0, .45].forEach(k => { g.fillRect(r * k - r * .06, -r * .55, r * .12, r * .45); });
+    g.fillStyle = '#ff8a00'; [-.45, 0, .45].forEach(k => { g.beginPath(); g.ellipse(r * k, -r * .7, r * .09, r * .16, 0, 0, TAU); g.fill(); });
+  } else if (kind === 'trophy') {
+    g.fillStyle = '#ffd43b'; g.beginPath(); g.moveTo(-r * .6, -r * .85); g.lineTo(r * .6, -r * .85); g.quadraticCurveTo(r * .55, r * .2, 0, r * .3); g.quadraticCurveTo(-r * .55, r * .2, -r * .6, -r * .85); g.fill();
+    g.fillRect(-r * .1, r * .25, r * .2, r * .4); g.fillRect(-r * .45, r * .62, r * .9, r * .22);
+    g.strokeStyle = '#ffd43b'; g.beginPath(); g.arc(-r * .6, -r * .45, r * .3, Math.PI * .5, Math.PI * 1.5); g.moveTo(r * .6, -r * .75); g.arc(r * .6, -r * .45, r * .3, -Math.PI * .5, Math.PI * .5); g.stroke();
+  } else if (kind === 'heart') {
+    g.fillStyle = '#ff4a6b'; g.beginPath(); g.moveTo(0, r * .85);
+    g.bezierCurveTo(-r * 1.2, 0, -r * .7, -r * 1, 0, -r * .35); g.bezierCurveTo(r * .7, -r * 1, r * 1.2, 0, 0, r * .85); g.fill();
+  } else if (kind === 'flag') {
+    g.strokeStyle = '#cfd5e2'; g.beginPath(); g.moveTo(-r * .8, -r); g.lineTo(-r * .8, r); g.stroke();
+    const sq = r * .32; for (let a = 0; a < 3; a++) for (let b = 0; b < 4; b++) { g.fillStyle = (a + b) % 2 ? '#111' : '#f2f4f8'; g.fillRect(-r * .75 + b * sq, -r * .95 + a * sq, sq, sq); }
   } else {
-    g.fillStyle = '#ffc21a'; g.beginPath(); g.arc(0, 0, r * .5, 0, TAU); g.fill();
+    g.fillStyle = '#ffc21a'; g.beginPath();
+    for (let k = 0; k < 10; k++) { const rr = k % 2 ? r * .4 : r, a = -Math.PI / 2 + k * Math.PI / 5; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    g.closePath(); g.fill();
   }
   g.restore();
 }
@@ -87,11 +104,15 @@ PW.DriveBy = class DriveBy {
   }
   /* Pit board on a pole, held up from the cockpit side like a crew board. */
   drawBoard(g, r, x, y, s, H) {
-    const b = r.board, bh = Math.min(H * .52, 92), pad = bh * .12;
-    const titleF = Math.round(bh * .3), subF = Math.round(bh * .15), topF = Math.round(bh * .14);
-    g.font = `800 ${titleF}px "Saira Condensed", "Arial Narrow", sans-serif`; const tw1 = g.measureText(b.title).width;
-    g.font = `500 ${subF}px "Saira", "Segoe UI", sans-serif`; const tw2 = g.measureText(b.sub || '').width;
-    const iconW = bh * .55, bw = Math.max(tw1, tw2) + iconW + pad * 3;
+    const b = r.board, W = this.cv.clientWidth;
+    let bh = Math.min(H * .52, r.big ? H * .55 : 92), pad, titleF, subF, topF, iconW, bw;
+    for (let pass = 0; pass < 2; pass++) {                 // shrink to fit narrow screens
+      pad = bh * .12; titleF = Math.round(bh * .3); subF = Math.round(bh * .15); topF = Math.round(bh * .14); iconW = bh * .55;
+      g.font = `800 ${titleF}px "Saira Condensed", "Arial Narrow", sans-serif`; const tw1 = g.measureText(b.title).width;
+      g.font = `500 ${subF}px "Saira", "Segoe UI", sans-serif`; const tw2 = g.measureText(b.sub || '').width;
+      bw = Math.max(tw1, tw2) + iconW + pad * 3;
+      if (bw <= W - 24) break; bh *= (W - 24) / bw;
+    }
     const cx = x + 480 * s, bx = cx - bw / 2, by = Math.max(2, y + 40 * s - bh - 10);
     g.strokeStyle = '#9aa3b5'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, by + bh); g.lineTo(cx, y + 110 * s); g.stroke();
     g.fillStyle = '#0b0d12'; g.beginPath(); g.roundRect(bx, by, bw, bh, 4); g.fill();
