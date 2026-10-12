@@ -1,4 +1,4 @@
-/* Living Racetrack · Pit Wall
+/* Lapwall
    Core data. Every team, driver code and original circuit here is invented for this project. */
 window.PW = window.PW || {};
 
@@ -109,7 +109,7 @@ PW.DEFAULT_SETTINGS = {
   teams: null,              // overrides for name/color
   drivers: null,            // overrides for name/flag/num per slot
   season: { pts: [], wins: [], races: 0 },
-  driveby: true,            // drive-by cars in ambient view
+  driveby: true,            // Zoom-by cars in ambient view
   drivebyMins: 4,
   drivebySpeed: 'cruise',   // fast | cruise | parade
   drivebyDriver: -1,        // -1 random, otherwise a driver slot

@@ -1,6 +1,6 @@
 # Security and privacy
 
-Pit Wall is built so there is nothing to steal.
+Lapwall is built so there is nothing to steal.
 
 ## What the app does with your data
 
@@ -12,7 +12,7 @@ Pit Wall is built so there is nothing to steal.
 
 - Everything you type (driver and team names, reminder text, imported track names) is treated as plain text, escaped before display and clamped to a fixed length. Saved settings are re-validated every time they load.
 - Imported track files are parsed as JSON only, never run as code, and are rejected over 5 MB or 20,000 points.
-- Desktop app (Electron): context isolation, sandboxed renderers and no Node.js access in any page; navigation, pop-ups, embedded web views and device permissions (camera, microphone, location, notifications) are all blocked. The drive-by window is click-through and never takes focus.
+- Desktop app (Electron): context isolation, sandboxed renderers and no Node.js access in any page; navigation, pop-ups, embedded web views and device permissions (camera, microphone, location, notifications) are all blocked. The Zoom-by window is click-through and never takes focus.
 - Dependencies: the web app has none. The desktop app only uses Electron and electron-builder for packaging; Dependabot watches them and the GitHub Actions for updates.
 
 ## Keeping the repository safe

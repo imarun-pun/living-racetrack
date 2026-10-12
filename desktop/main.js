@@ -1,4 +1,4 @@
-// Pit Wall desktop: the display in a window, plus a transparent, click-through strip
+// Lapwall desktop: the display in a window, plus a transparent, click-through strip
 // above the taskbar where a car drives by every so often.
 const { app, BrowserWindow, Tray, Menu, screen, nativeImage, ipcMain } = require('electron');
 const path = require('path');
@@ -17,11 +17,11 @@ const icon = () => nativeImage.createFromPath(path.join(__dirname, 'app', 'icons
 
 function openPitWall() {
   if (win) { win.show(); win.focus(); return; }
-  win = new BrowserWindow({ width: 1280, height: 760, backgroundColor: '#07090d', title: 'Pit Wall', icon: icon(), autoHideMenuBar: true,
+  win = new BrowserWindow({ width: 1280, height: 760, backgroundColor: '#07090d', title: 'Lapwall', icon: icon(), autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } });
   lockDown(win);
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
-  win.on('closed', () => { win = null; }); // closing the window keeps the drive-bys running from the tray
+  win.on('closed', () => { win = null; }); // closing the window keeps the Zoom-bys running from the tray
 }
 
 /* Security: pages may only show our own local files. No navigation away, no pop-ups, no device permissions. */
@@ -78,23 +78,23 @@ function buildMenu() {
   const every = m => ({ label: m < 60 ? `Every ${m} minutes` : 'Every hour', type: 'radio', checked: cfg.everyMin === m,
     click: () => { cfg.everyMin = m; saveCfg(); schedule(); } });
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Open Pit Wall', click: openPitWall },
-    { label: 'Drive by now', click: () => driveBy() },
+    { label: 'Open Lapwall', click: openPitWall },
+    { label: 'Zoom-by now', click: () => driveBy() },
     { label: 'Water reminder now', click: () => driveBy('water') },
     { type: 'separator' },
     rem('water', 'Drink water reminder', [30, 45, 60, 90]),
     rem('stretch', 'Stretch reminder', [45, 60, 90, 120]),
     rem('eyes', 'Rest your eyes reminder', [20, 30, 60]),
-    rem('custom', 'My own message (set in Pit Wall)', [30, 60, 120]),
+    rem('custom', 'My own message (set in Lapwall)', [30, 60, 120]),
     { type: 'separator' },
     every(5), every(15), every(30), every(60),
-    { label: 'Pause drive-bys', type: 'checkbox', checked: cfg.paused, click: i => { cfg.paused = i.checked; saveCfg(); schedule(); } },
+    { label: 'Pause Zoom-bys', type: 'checkbox', checked: cfg.paused, click: i => { cfg.paused = i.checked; saveCfg(); schedule(); } },
     { label: 'Engine sound', type: 'checkbox', checked: cfg.sound, click: i => { cfg.sound = i.checked; saveCfg(); } },
     { type: 'separator' },
-    { label: 'Open Pit Wall at start', type: 'checkbox', checked: cfg.openOnStart, click: i => { cfg.openOnStart = i.checked; saveCfg(); } },
+    { label: 'Open Lapwall at start', type: 'checkbox', checked: cfg.openOnStart, click: i => { cfg.openOnStart = i.checked; saveCfg(); } },
     { label: 'Start when I log in', type: 'checkbox', checked: cfg.atLogin, click: i => { cfg.atLogin = i.checked; saveCfg(); app.setLoginItemSettings({ openAtLogin: i.checked }); } },
     { type: 'separator' },
-    { label: 'Quit Pit Wall', click: () => app.quit() }
+    { label: 'Quit Lapwall', click: () => app.quit() }
   ]));
 }
 
@@ -107,7 +107,7 @@ app.on('web-contents-created', (_e, wc) => {
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) app.dock.setIcon(icon());
   tray = new Tray(icon().resize({ width: 18, height: 18 }));
-  tray.setToolTip('Pit Wall');
+  tray.setToolTip('Lapwall');
   tray.on('click', openPitWall);
   buildMenu();
   createOverlay();

@@ -1,5 +1,5 @@
-/* Offline cache so an installed Pit Wall keeps running without Wi-Fi. */
-const CACHE = 'pitwall-v7';
+/* Offline cache so an installed Lapwall keeps running without Wi-Fi. */
+const CACHE = 'lapwall-v7';
 const FILES = ['./', './index.html', './css/fonts.css', './css/style.css',
   './fonts/saira-condensed-latin-500-normal.woff2', './fonts/saira-condensed-latin-700-normal.woff2', './fonts/saira-condensed-latin-800-normal.woff2',
   './fonts/saira-latin-400-normal.woff2', './fonts/saira-latin-500-normal.woff2', './fonts/saira-latin-600-normal.woff2',

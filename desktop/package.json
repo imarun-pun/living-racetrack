@@ -1,8 +1,8 @@
 {
-  "name": "pit-wall-desktop",
-  "productName": "Pit Wall",
+  "name": "lapwall-desktop",
+  "productName": "Lapwall",
   "version": "0.4.0",
-  "description": "Pit Wall for your desktop: the race display in a window, plus cars that drive by above your taskbar.",
+  "description": "Lapwall for your desktop: the race display in a window, plus cars that drive by above your taskbar.",
   "main": "main.js",
   "author": "Arun Pun",
   "license": "SEE LICENSE IN ../LICENSE.md",
@@ -17,14 +17,14 @@
     "electron-builder": "25.1.8"
   },
   "build": {
-    "appId": "com.arunpun.pitwall",
-    "productName": "Pit Wall",
+    "appId": "com.arunpun.lapwall",
+    "productName": "Lapwall",
     "copyright": "Copyright © 2026 Arun Pun",
     "directories": { "output": "release" },
     "files": ["main.js", "preload.js", "overlay.html", "overlay.js", "app/**/*"],
     "win": { "target": "nsis", "icon": "app/icons/icon-512.png" },
-    "nsis": { "oneClick": true, "artifactName": "PitWall-Setup-${version}.${ext}" },
-    "mac": { "target": "dmg", "category": "public.app-category.entertainment", "icon": "app/icons/icon-512.png", "artifactName": "PitWall-${version}.${ext}" },
-    "linux": { "target": "AppImage", "icon": "app/icons/icon-512.png", "artifactName": "PitWall-${version}.${ext}" }
+    "nsis": { "oneClick": true, "artifactName": "Lapwall-Setup-${version}.${ext}" },
+    "mac": { "target": "dmg", "category": "public.app-category.entertainment", "icon": "app/icons/icon-512.png", "artifactName": "Lapwall-${version}.${ext}" },
+    "linux": { "target": "AppImage", "icon": "app/icons/icon-512.png", "artifactName": "Lapwall-${version}.${ext}" }
   }
 }

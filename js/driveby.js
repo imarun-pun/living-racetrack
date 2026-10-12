@@ -1,4 +1,4 @@
-/* Drive-by: a full-size single-seater with the driver's name and flag sweeps across the bottom
+/* Zoom-by: a full-size single-seater with the driver's name and flag sweeps across the bottom
    of the screen, right to left. It slows down in the middle so the name is easy to read.
    With a `board`, it carries a pit board instead: drink water, stretch, rest your eyes or your own message.
    Used inside the web app and by the desktop app's overlay above the taskbar. */

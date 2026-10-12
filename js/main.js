@@ -410,7 +410,7 @@ function frame(now) {
 }
 let lightsOff = 0;
 
-// ---------- Drive-by ----------
+// ---------- Zoom-by ----------
 function startDriveBy(board) {
   const pool = race.cars.filter(c => !c.out), favs = pool.filter(c => c.team === S.favTeam);
   const list = favs.length && Math.random() < .5 ? favs : pool;
@@ -624,7 +624,7 @@ $('s-clear').addEventListener('click', () => {
 });
 $('s-reset').addEventListener('click', () => { S = { ...structuredClone(PW.DEFAULT_SETTINGS), mode: S.mode }; save(); syncForm(); applyTeams(); round++; newRace(pickNext(null)); });
 
-// Send-a-drive-by opens next to this page on the web, or on the public site otherwise
+// Send-a-Zoom-by opens next to this page on the web, or on the public site otherwise
 if (!/^https?:$/.test(location.protocol) || /claude\.ai$|claudeusercontent/.test(location.hostname)) $('bsend').href = PW.HOME + 'send.html';
 
 // ---------- Boot ----------

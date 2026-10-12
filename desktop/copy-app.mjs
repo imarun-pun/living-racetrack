@@ -1,4 +1,4 @@
-// Copies the web app into desktop/app so the desktop build ships the same Pit Wall.
+// Copies the web app into desktop/app so the desktop build ships the same Lapwall.
 import { cpSync, rmSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

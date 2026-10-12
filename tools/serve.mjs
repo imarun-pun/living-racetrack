@@ -13,4 +13,4 @@ createServer(async (req, res) => {
   if (!file.startsWith(root)) { res.writeHead(403).end(); return; }
   try { const body = await readFile(file); res.writeHead(200, { 'content-type': types[extname(file)] || 'application/octet-stream' }).end(body); }
   catch { res.writeHead(404).end('Not found'); }
-}).listen(port, () => console.log(`Pit Wall running at http://localhost:${port}`));
+}).listen(port, () => console.log(`Lapwall running at http://localhost:${port}`));

@@ -1,5 +1,5 @@
 /* Real race-weekend calendar (dates and places only). When a real race weekend is on,
-   Pit Wall can switch to that circuit's replica and show a countdown. Update once a year.
+   Lapwall can switch to that circuit's replica and show a countdown. Update once a year.
    Source: the published 2026 world championship calendar. Dates are Friday to Sunday, local. */
 window.PW = window.PW || {};
 PW.CALENDAR = [

@@ -1,4 +1,4 @@
-# Customizing Pit Wall
+# Customizing Lapwall
 
 Most changes can be made from the **Customize** panel on screen. Settings are saved in that browser.
 
@@ -42,17 +42,17 @@ Open **Customize → Drivers**. Each row is one car: flag, full name and car num
 
 Every finished race adds points: 25, 18, 15, 12, 10, 8, 6, 4, 2, 1 for the top ten, plus 1 for the fastest lap if that driver finishes in the top ten. Standings show in the Customize panel and during the garage break. **Start a new season** clears them.
 
-## Drive-bys
+## Zoom-bys
 
 In the web app, cars drive by in the ambient view every few minutes (turn it off under **Customize → Room**, press `D` to trigger one). The desktop app uses the same drivers and teams and is configured from its tray menu.
 
 ## Pit-board reminders
 
-**Customize → Drive-bys and pit-board reminders.** Turn on *Drink water*, *Stretch break* or *Rest your eyes* and pick how often. *My own message* puts any short text (up to 28 characters) on the board, for example "Call Mom". *Drive-by speed* sets how long a car takes to cross the screen: 5, 9 or 14 seconds. Press `W` for a water reminder right now. In the desktop app the same reminders are set from the tray menu; your own message text comes from the Pit Wall settings.
+**Customize → Zoom-bys and pit-board reminders.** Turn on *Drink water*, *Stretch break* or *Rest your eyes* and pick how often. *My own message* puts any short text (up to 28 characters) on the board, for example "Call Mom". *Zoom-by speed* sets how long a car takes to cross the screen: 5, 9 or 14 seconds. Press `W` for a water reminder right now. In the desktop app the same reminders are set from the tray menu; your own message text comes from the Lapwall settings.
 
-## Send a drive-by
+## Send a Zoom-by
 
-Click **Send a drive-by** (or open `send.html`). Pick an occasion, write who it's for and a short message, choose your flag, colour and number, then **Create link and QR code**. Send it by email, text or any app, or print the QR code on a card. The whole message is stored inside the link after the `#`, so nothing is uploaded anywhere.
+Click **Send a Zoom-by** (or open `send.html`). Pick an occasion, write who it's for and a short message, choose your flag, colour and number, then **Create link and QR code**. Send it by email, text or any app, or print the QR code on a card. The whole message is stored inside the link after the `#`, so nothing is uploaded anywhere.
 
 ### Shorter, friendlier links
 
@@ -60,7 +60,7 @@ Links look like `…/living-racetrack/z/#WzAsIlNhYmluYSJd`. In iMessage, WhatsAp
 
 ## Fantasy league and real race weekends
 
-In **Customize → Season**, add up to eight players and give each two drivers. Their score is those drivers' season points. In **Customize → Tracks**, *Follow the real race calendar* makes Pit Wall race the real weekend's circuit; update `js/calendar.js` once a year with the new dates.
+In **Customize → Season**, add up to eight players and give each two drivers. Their score is those drivers' season points. In **Customize → Tracks**, *Follow the real race calendar* makes Lapwall race the real weekend's circuit; update `js/calendar.js` once a year with the new dates.
 
 ## Teams
 

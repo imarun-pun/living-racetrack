@@ -1,4 +1,4 @@
-# Builds the Pit Wall desktop app for Windows, macOS and Linux.
+# Builds the Lapwall desktop app for Windows, macOS and Linux.
 # Run it from the Actions tab (Run workflow), or push a version tag like v0.3.0.
 name: Build desktop app
 on:
@@ -27,7 +27,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4
         with:
-          name: PitWall-${{ matrix.os }}
+          name: Lapwall-${{ matrix.os }}
           if-no-files-found: ignore
           path: |
             desktop/release/*.exe

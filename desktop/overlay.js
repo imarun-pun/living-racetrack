@@ -1,4 +1,4 @@
-// Reads the same drivers and teams you set in Pit Wall (shared local storage), then sends one car past.
+// Reads the same drivers and teams you set in Lapwall (shared local storage), then sends one car past.
 const db = new PW.DriveBy(document.getElementById('c'));
 const settings = () => { try { return JSON.parse(localStorage.getItem('pitwall-settings') || '{}'); } catch (e) { return {}; } };
 let last = 0;

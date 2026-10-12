@@ -1,4 +1,4 @@
-/* Send-a-drive-by: the whole message travels inside the link, after the # sign.
+/* Send-a-Zoom-by: the whole message travels inside the link, after the # sign.
    That part of a URL is never sent to any server, so messages stay between sender and recipient. */
 window.PW = window.PW || {};
 (() => {
@@ -15,7 +15,7 @@ PW.OCCASIONS = {
 const clean = (v, n) => (typeof v === 'string' ? v : '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
 const hex = (v, d) => /^#[0-9a-fA-F]{6}$/.test(v) ? v : d;
 
-/* Validate and normalise a drive-by card. Anything unexpected falls back to a safe default. */
+/* Validate and normalise a Zoom-by card. Anything unexpected falls back to a safe default. */
 PW.cleanCard = c => {
   c = c && typeof c === 'object' ? c : {};
   const o = PW.OCCASIONS[c.o] ? c.o : 'custom';
@@ -23,7 +23,7 @@ PW.cleanCard = c => {
   const n = Number.isInteger(+c.n) && +c.n >= 0 && +c.n <= 99 ? +c.n : 1;
   return {
     o, t: clean(c.t, 24) || PW.OCCASIONS[o].title || 'PIT BOARD', to: clean(c.to, 20), m: clean(c.m, 60),
-    fr: clean(c.fr, 24), fl: flag, n, c: hex(c.c, '#ff4a3d'), c2: hex(c.c2, '#1b1f27'), tm: clean(c.tm, 16) || 'Pit Wall'
+    fr: clean(c.fr, 24), fl: flag, n, c: hex(c.c, '#ff4a3d'), c2: hex(c.c2, '#1b1f27'), tm: clean(c.tm, 16) || 'Lapwall'
   };
 };
 const toB64 = s => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -53,7 +53,7 @@ PW.cardLink = card => {
   const base = /^https?:$/.test(location.protocol) && !/claude\.ai$|claudeusercontent/.test(location.hostname) ? new URL('z/', location.href.replace(/z\/[^/]*$/, '')).href : PW.HOME + 'z/';
   return base + '#' + PW.encodeCard(card);
 };
-/* Turn a card into what the drive-by draws. */
+/* Turn a card into what the Zoom-by draws. */
 PW.cardBoard = card => {
   const occ = PW.OCCASIONS[card.o] || PW.OCCASIONS.custom;
   const title = (card.t + (card.to ? ' ' + card.to : '')).toUpperCase().slice(0, 40);

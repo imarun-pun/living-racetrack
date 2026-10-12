@@ -1,6 +1,6 @@
 {
-  "name": "Living Racetrack · Pit Wall",
-  "short_name": "Pit Wall",
+  "name": "Lapwall",
+  "short_name": "Lapwall",
   "description": "An always-on animated motorsport display for your wall.",
   "start_url": "./index.html",
   "scope": "./",

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pit Wall</title>
-<meta name="description" content="Living Racetrack · Pit Wall: an always-on animated motorsport display for your wall.">
+<title>Lapwall</title>
+<meta name="description" content="Lapwall: an always-on animated motorsport display for your wall.">
 <meta name="theme-color" content="#07090d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -77,7 +77,7 @@
     <button id="bview" type="button">View: TV map</button>
     <button id="bmode" type="button">Ambient</button>
     <button id="bnext" type="button">Next race</button>
-    <a class="btn" id="bsend" href="send.html" target="_blank" rel="noopener">Send a drive-by</a>
+    <a class="btn" id="bsend" href="send.html" target="_blank" rel="noopener">Send a Zoom-by</a>
     <button id="bset" type="button">Customize</button>
     <button id="bfull" type="button">Full screen</button>
   </nav>
@@ -137,10 +137,10 @@
       <ol class="season-list" id="s-league"></ol>
     </fieldset>
     <fieldset>
-      <legend>Drive-bys and pit-board reminders</legend>
-      <label class="field">Drive-by speed <select id="s-dbspeed"><option value="fast">Fast · 5 s</option><option value="cruise">Cruise · 9 s</option><option value="parade">Parade lap · 14 s</option></select></label>
+      <legend>Zoom-bys and pit-board reminders</legend>
+      <label class="field">Zoom-by speed <select id="s-dbspeed"><option value="fast">Fast · 5 s</option><option value="cruise">Cruise · 9 s</option><option value="parade">Parade lap · 14 s</option></select></label>
       <label class="field">Car that drives by <select id="s-dbcar"><option value="-1">Random driver</option></select></label>
-      <label class="field check"><input type="checkbox" id="s-driveby"> Random drive-bys in ambient view</label>
+      <label class="field check"><input type="checkbox" id="s-driveby"> Random Zoom-bys in ambient view</label>
       <div class="field"><label><input type="checkbox" id="s-rw"> Drink water</label> <select id="s-rwm" aria-label="Drink water interval"><option value="30">Every 30 min</option><option value="45">Every 45 min</option><option value="60">Every hour</option><option value="90">Every 90 min</option></select></div>
       <div class="field"><label><input type="checkbox" id="s-rs"> Stretch break</label> <select id="s-rsm" aria-label="Stretch break interval"><option value="45">Every 45 min</option><option value="60">Every hour</option><option value="90">Every 90 min</option><option value="120">Every 2 hours</option></select></div>
       <div class="field"><label><input type="checkbox" id="s-re"> Rest your eyes</label> <select id="s-rem" aria-label="Rest your eyes interval"><option value="20">Every 20 min</option><option value="30">Every 30 min</option><option value="60">Every hour</option></select></div>
@@ -159,7 +159,7 @@
       <legend>Room</legend>
       <label class="field check"><input type="checkbox" id="s-dim"> Dim the display at night</label>
       <label class="field">Dim between <span style="display:flex;gap:6px;align-items:center"><input type="number" id="s-from" min="0" max="23"> and <input type="number" id="s-to" min="0" max="23"></span></label>
-      <p class="hint">Keys: <kbd>A</kbd> ambient · <kbd>N</kbd> next race · <kbd>C</kbd> customize · <kbd>F</kbd> full screen · <kbd>P</kbd> pause · <kbd>D</kbd> drive-by · <kbd>W</kbd> water reminder · <kbd>V</kbd> change view</p>
+      <p class="hint">Keys: <kbd>A</kbd> ambient · <kbd>N</kbd> next race · <kbd>C</kbd> customize · <kbd>F</kbd> full screen · <kbd>P</kbd> pause · <kbd>D</kbd> Zoom-by · <kbd>W</kbd> water reminder · <kbd>V</kbd> change view</p>
       <button type="button" id="s-reset">Reset everything</button>
     </fieldset>
     <p class="hint">Default teams, drivers and the four original circuits are fictional. Real layouts are traced from open map data and named by location. Not affiliated with any racing series.</p>

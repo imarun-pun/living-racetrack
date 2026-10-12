@@ -1,4 +1,4 @@
-/* Creator page: builds the card, previews the drive-by live, and hands out the link and QR code. */
+/* Creator page: builds the card, previews the Zoom-by live, and hands out the link and QR code. */
 (() => {
 const $ = id => document.getElementById(id);
 const COLOURS = PW.DEFAULT_TEAMS.map(t => [t.color, t.color2]);
@@ -10,7 +10,7 @@ $('fl').insertAdjacentHTML('beforeend', PW.flagOptions().map(([c, n]) => `<optio
 $('sw').innerHTML = COLOURS.map(([c], i) => `<button type="button" data-i="${i}" style="background:${c}" aria-label="Colour ${i + 1}" aria-pressed="${i === 0}"></button>`).join('') +
   '<input type="color" id="cc" value="#ff4a3d" aria-label="Pick any colour">';
 
-// Prefill from "send one back" (#to=Name) or from Pit Wall's own first driver
+// Prefill from "send one back" (#to=Name) or from Lapwall's own first driver
 const pre = new URLSearchParams(location.hash.slice(1));
 if (pre.get('to')) $('to').value = pre.get('to').slice(0, 20);
 try {
@@ -34,7 +34,7 @@ $('cc').addEventListener('input', e => { colour = [e.target.value, '#1b1f27']; $
 ['fl', 'n'].forEach(id => $(id).addEventListener('change', restart));
 syncOcc();
 
-// Live preview: loops the drive-by with the current card
+// Live preview: loops the Zoom-by with the current card
 const pv = new PW.DriveBy($('pv'));
 function restart() {
   const c = card();
@@ -60,7 +60,7 @@ $('form').addEventListener('submit', e => {
   $('email').href = 'mailto:?subject=' + encodeURIComponent(`Zoooom! A race car is coming${who}`) + '&body=' + encodeURIComponent(text);
   $('sms').href = 'sms:?&body=' + encodeURIComponent(text);
   $('share').hidden = !navigator.share;
-  $('share').onclick = () => navigator.share({ title: 'A drive-by for you', text: lead, url }).catch(() => {});
+  $('share').onclick = () => navigator.share({ title: 'A Zoom-by for you', text: lead, url }).catch(() => {});
   drawQR(url);
   $('result').hidden = false;
   $('link').focus(); $('link').select();

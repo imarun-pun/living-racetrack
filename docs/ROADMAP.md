@@ -4,14 +4,14 @@ Living Racetrack starts as free software anyone can put on a screen, and grows i
 
 ## Shipped
 
-**v0.1 Pit Wall:** animated race, timing tower, start lights, safety car, podium, ambient view.
+**v0.1 Lapwall:** animated race, timing tower, start lights, safety car, podium, ambient view.
 **v0.2 (this version):** spins, crashes, red flags with standing restarts, punctures, pit cam, rain and tyre strategy, garage break with an original car, 40 real-layout replicas, track import, team livery editor, favourite team, night dimming, offline install, Raspberry Pi kiosk.
 
-**v0.3:** your own drivers with names, flags and numbers; season championship; DRS zones; team radio; drive-by cars in ambient view; desktop tray app with drive-bys above the taskbar.
+**v0.3:** your own drivers with names, flags and numbers; season championship; DRS zones; team radio; Zoom-by cars in ambient view; desktop tray app with Zoom-bys above the taskbar.
 
-**v0.4:** slower drive-bys that brake mid-screen; pit-board reminders (water, stretch, eyes, your own message); self-hosted fonts and a strict content security policy; desktop app hardening.
+**v0.4:** slower Zoom-bys that brake mid-screen; pit-board reminders (water, stretch, eyes, your own message); self-hosted fonts and a strict content security policy; desktop app hardening.
 
-**v0.5:** send-a-drive-by links and QR codes; podium champagne celebration; fantasy league; real race-weekend calendar; realistic circuit map with gravel traps, grandstands and pit garages; world locator; map zoom; choose the drive-by car.
+**v0.5:** send-a-Zoom-by links and QR codes; podium champagne celebration; fantasy league; real race-weekend calendar; realistic circuit map with gravel traps, grandstands and pit garages; world locator; map zoom; choose the Zoom-by car.
 
 **v0.6:** realistic map on a black background; real safety car that leaves and returns through the pit lane; crane recovery of crashed cars; short `z/` links with preview cards.
 
@@ -42,7 +42,7 @@ Living Racetrack starts as free software anyone can put on a screen, and grows i
 | Package | Price idea | What's included |
 |---|---|---|
 | **Community** | Free | Web app, original circuits, real-layout replicas, simulation, ambient view, track import, Raspberry Pi kiosk. Noncommercial use. |
-| **Pit Wall Plus** | $3–5 / month or $29 / year | Art style packs, championship mode, predictions, phone remote, smart-light sync, settings synced across screens, new content each month. |
+| **Lapwall Plus** | $3–5 / month or $29 / year | Art style packs, championship mode, predictions, phone remote, smart-light sync, settings synced across screens, new content each month. |
 | **Sim Pro** | $6–8 / month | Plus, live sim-racing telemetry, multi-screen, custom branding for streamers. |
 | **Venue licence** | $30–80 / screen / month | Commercial use for bars, sim centres and kart tracks, venue branding, live kart timing integration, support. |
 | **Hardware** | see below | Living Racetrack frames with the software built in, 1 year of Plus included. |
@@ -68,7 +68,7 @@ Build order: software first, then one hardware size after demand is proven.
 
 ## Legal checklist before selling
 
-- Trademark search for *Living Racetrack* and *Pit Wall*; file for the name you keep.
+- Trademark search for *Living Racetrack* and *Lapwall*; file for the name you keep.
 - Keep official series names, logos, team names and liveries out of the product and marketing.
 - Get any live professional-series data only through a written licence.
 - Talk to an IP attorney about the enclosure design and the commercial licence terms.
