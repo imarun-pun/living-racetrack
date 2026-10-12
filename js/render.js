@@ -3,28 +3,70 @@ window.PW = window.PW || {};
 (() => {
 const mod = PW.mod;
 
-/* Top-down single-seater, drawn facing +x. len/wid in px. */
+/* Top-down modern F1-style car, drawn facing +x. len/wid in px (real proportions about 5.6 m x 2.0 m).
+   Front wing with endplates, nose, wishbones, wheels with rims, coke-bottle sidepods, halo,
+   engine-cover spine, floor edge and rear wing. Drawn once per livery into a sprite (see PW.carSprite). */
 PW.drawCarTop = function (g, len, wid, c1, c2, detail, noTyres) {
   if (!detail || len < 13) {
     g.fillStyle = c1; g.beginPath(); g.roundRect(-len / 2, -wid / 2, len, wid, wid / 2); g.fill();
     g.fillStyle = 'rgba(5,7,10,.55)'; g.fillRect(-len * .05, -wid * .2, len * .24, wid * .4);
     return;
   }
-  const X = x => x * len, Y = y => y * wid;
-  g.fillStyle = '#0b0c0f';
-  if (!noTyres) { g.fillRect(X(-.41), Y(-.52), X(.19), Y(.22)); g.fillRect(X(-.41), Y(.30), X(.19), Y(.22)); } // rear tyres
-  if (!noTyres) { g.fillRect(X(.17), Y(-.49), X(.15), Y(.19)); g.fillRect(X(.17), Y(.30), X(.15), Y(.19)); } // front tyres
-  g.fillStyle = c1; g.beginPath();
-  [[-.42,-.16],[-.2,-.22],[-.12,-.34],[.06,-.3],[.12,-.16],[.36,-.07],[.47,-.035],[.47,.035],[.36,.07],[.12,.16],[.06,.3],[-.12,.34],[-.2,.22],[-.42,.16]]
-    .forEach(([x, y], k) => k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)));
-  g.closePath(); g.fill();
-  g.fillStyle = c2; g.fillRect(X(-.5), Y(-.46), X(.08), Y(.92));            // rear wing
-  g.fillRect(X(.41), Y(-.5), X(.07), Y(1));                                    // front wing
-  g.fillStyle = c1; g.fillRect(X(.44), Y(-.5), X(.03), Y(1));
-  g.fillStyle = 'rgba(5,7,10,.8)'; g.beginPath(); g.ellipse(X(.02), 0, X(.075), Y(.11), 0, 0, 6.29); g.fill(); // cockpit
-  g.fillStyle = c2; g.beginPath(); g.arc(X(.0), 0, Y(.075), 0, 6.29); g.fill();                              // helmet
-  g.strokeStyle = 'rgba(10,12,16,.9)'; g.lineWidth = Math.max(1, wid * .07); g.beginPath();                  // halo
-  g.moveTo(X(.1), 0); g.lineTo(X(.05), Y(-.12)); g.moveTo(X(.1), 0); g.lineTo(X(.05), Y(.12)); g.stroke();
+  const X = x => x * len, Y = y => y * wid, carbon = '#14161b', carbon2 = '#22252c';
+  const poly = (pts, fill) => { g.fillStyle = fill; g.beginPath(); pts.forEach(([x, y], k) => k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y))); g.closePath(); g.fill(); };
+  const mirror = pts => pts.concat(pts.slice().reverse().map(([x, y]) => [x, -y]));
+  // suspension arms (under the body)
+  g.strokeStyle = carbon; g.lineWidth = Math.max(1, wid * .028); g.lineCap = 'round';
+  g.beginPath();
+  [[.17, .33], [.27, .33]].forEach(([fx]) => { g.moveTo(X(fx), Y(-.06)); g.lineTo(X(.29), Y(-.36)); g.moveTo(X(fx), Y(.06)); g.lineTo(X(.29), Y(.36)); });
+  [[-.2, -.36], [-.3, -.36]].forEach(([rx]) => { g.moveTo(X(rx), Y(-.12)); g.lineTo(X(-.355), Y(-.36)); g.moveTo(X(rx), Y(.12)); g.lineTo(X(-.355), Y(.36)); });
+  g.stroke();
+  // wheels: front narrower than rear
+  if (!noTyres) {
+    const tyre = (x0, x1, y0, y1) => {
+      g.fillStyle = '#25272d'; g.beginPath(); g.roundRect(X(x0), Y(y0), X(x1 - x0), Y(y1 - y0), Y(.035)); g.fill();
+      g.strokeStyle = '#4a4f5a'; g.lineWidth = Math.max(1, wid * .02); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.12)'; for (let k = 1; k < 4; k++) g.fillRect(X(x0 + (x1 - x0) * k / 4) - .5, Y(y0), 1, Y(y1 - y0));   // tread shading
+      g.fillStyle = '#6a707c'; g.fillRect(X(x0 + (x1 - x0) * .38), Y(y0 + (y1 - y0) * .3), X((x1 - x0) * .24), Y((y1 - y0) * .4));
+    };
+    tyre(.225, .355, -.49, -.3); tyre(.225, .355, .3, .49);
+    tyre(-.425, -.275, -.5, -.29); tyre(-.425, -.275, .29, .5);
+  }
+  // floor edge
+  poly(mirror([[.16, -.12], [.1, -.3], [-.18, -.31], [-.3, -.2], [-.4, -.14]]), carbon);
+  // sidepods (coke-bottle shape) and chassis
+  poly(mirror([[.13, -.1], [.08, -.27], [-.02, -.28], [-.14, -.24], [-.27, -.13], [-.36, -.08]]), c1);
+  poly(mirror([[.11, -.13], [.085, -.25], [.06, -.25], [.08, -.13]]), carbon2);            // radiator inlets
+  // nose and front of chassis
+  poly(mirror([[.44, -.03], [.36, -.045], [.2, -.085], [.13, -.1]]), c1);
+  // livery stripe along the nose and spine
+  poly(mirror([[.43, -.012], [.2, -.03], [.02, -.035], [-.38, -.02]]), c2);
+  // front wing: main plane, flap, endplates
+  poly([[.47, -.47], [.5, -.47], [.5, .47], [.47, .47]], carbon);
+  poly([[.44, -.45], [.465, -.46], [.465, .46], [.44, .45]], c1);
+  g.fillStyle = c2; g.fillRect(X(.43), Y(-.5), X(.07), Y(.04)); g.fillRect(X(.43), Y(.46), X(.07), Y(.04));
+  // cockpit, helmet and halo
+  g.fillStyle = '#07080a'; g.beginPath(); g.ellipse(X(.03), 0, X(.075), Y(.075), 0, 0, 6.29); g.fill();
+  g.fillStyle = c2; g.beginPath(); g.arc(X(.015), 0, Y(.055), 0, 6.29); g.fill();
+  g.fillStyle = '#ffd43b'; g.fillRect(X(.03), Y(-.02), X(.012), Y(.04));                  // visor strip
+  g.strokeStyle = carbon; g.lineWidth = Math.max(1, wid * .035);
+  g.beginPath(); g.ellipse(X(.03), 0, X(.085), Y(.09), 0, -1.9, 1.9); g.moveTo(X(.115), 0); g.lineTo(X(.15), 0); g.stroke();
+  // airbox and engine-cover fin
+  g.fillStyle = carbon; g.beginPath(); g.ellipse(X(-.055), 0, X(.022), Y(.03), 0, 0, 6.29); g.fill();
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(X(-.36), Y(-.008), X(.28), Y(.016));
+  // rear wing: endplates, main plane, beam
+  g.fillStyle = c1; g.fillRect(X(-.5), Y(-.36), X(.085), Y(.05)); g.fillRect(X(-.5), Y(.31), X(.085), Y(.05));
+  poly([[-.43, -.33], [-.415, -.33], [-.415, .33], [-.43, .33]], c2);
+  poly([[-.5, -.33], [-.44, -.33], [-.44, .33], [-.5, .33]], carbon2);
+  g.fillStyle = '#ff2b2b'; g.fillRect(X(-.5), Y(-.02), X(.012), Y(.04));                  // rain light
+};
+/* Cached high-resolution sprite per livery, so small cars stay crisp and detailed. */
+const spriteCache = new Map();
+PW.carSprite = function (c1, c2) {
+  const key = c1 + c2; if (spriteCache.has(key)) return spriteCache.get(key);
+  const cv = document.createElement('canvas'); cv.width = 280; cv.height = 104;
+  const g = cv.getContext('2d'); g.translate(140, 52); PW.drawCarTop(g, 280, 100, c1, c2, true);
+  spriteCache.set(key, cv); return cv;
 };
 
 PW.Renderer = class Renderer {
@@ -262,7 +304,7 @@ PW.Renderer = class Renderer {
       const [x, y, a] = this.at(d.s, d.lat * w * .3);
       ctx.save(); ctx.translate(x, y); ctx.rotate(a + d.a); ctx.fillStyle = d.c; ctx.fillRect(-d.r, -d.r * .4, d.r * 2, d.r * .8); ctx.restore();
     }
-    const latPx = w * .3, len = Math.max(10, w * 1.05), wid = Math.max(4.5, w * .42), detail = w >= 12 || !!cam;
+    const latPx = w * .3, len = Math.max(15, w * 1.3), wid = len * .36, detail = true;
     const order = race.order.slice().reverse();
     // trails
     if (!this.reduce) for (const c of order) {
@@ -308,7 +350,7 @@ PW.Renderer = class Renderer {
       else if (c.out) ctx.globalAlpha = .55;
       if (this.style === 'circuit') { ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1.5; }
       else { ctx.shadowColor = c.color; ctx.shadowBlur = this.reduce || c.out ? 0 : w * .8; }
-      PW.drawCarTop(ctx, len, wid, c.color, c.color2, detail);
+      { const sh = len * 104 / 280; ctx.drawImage(PW.carSprite(c.color, c.color2), -len / 2, -sh / 2, len, sh); }
       ctx.restore();
       if (c.out && !pose && Math.floor(now / 400) % 2) { ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, len * .9, 0, 6.29); ctx.stroke(); }
       if (view.fav === c.team && !c.out) { ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = .5 + .3 * Math.sin(now / 250); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, len * .85, 0, 6.29); ctx.stroke(); ctx.globalAlpha = 1; }
